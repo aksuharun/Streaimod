@@ -111,7 +111,7 @@ function createYoutubeMessage(overrides: Record<string, unknown> = {}) {
 }
 
 function createIngestResponse(overrides: Record<string, unknown> = {}) {
-  return {
+  const base = {
     duplicate: false,
     event: {
       channelId: 'channel-1',
@@ -124,11 +124,54 @@ function createIngestResponse(overrides: Record<string, unknown> = {}) {
     },
     qna: null,
     moderation: {
+      agent: 'evo-moderation',
       action: 'IGNORE',
       catalogId: null,
-      reason: 'No violation'
-    },
-    ...overrides
+      reason: 'No violation',
+      workflow: {
+        unicodeCount: 0,
+        normalized: false,
+        normalizedMessage: 'Hello world',
+        banSkipped: false,
+        banAction: 'IGNORE',
+        banCatalogId: null,
+        banReason: 'No violation',
+        timeoutSkipped: false,
+        timeoutAction: 'IGNORE',
+        timeoutCatalogId: null,
+        timeoutReason: 'No violation'
+      }
+    }
+  }
+
+  const overrideQna =
+    overrides.qna && typeof overrides.qna === 'object'
+      ? (overrides.qna as Record<string, unknown>)
+      : undefined
+  const overrideModeration =
+    overrides.moderation && typeof overrides.moderation === 'object'
+      ? (overrides.moderation as Record<string, unknown>)
+      : undefined
+
+  return {
+    ...base,
+    ...overrides,
+    qna: overrideQna === undefined ? base.qna : overrideQna,
+    moderation:
+      overrideModeration === undefined
+        ? base.moderation
+        : {
+            ...base.moderation,
+            ...overrideModeration,
+            workflow:
+              overrideModeration.workflow &&
+              typeof overrideModeration.workflow === 'object'
+                ? {
+                    ...base.moderation.workflow,
+                    ...(overrideModeration.workflow as Record<string, unknown>)
+                  }
+                : base.moderation.workflow
+          }
   }
 }
 
@@ -168,7 +211,7 @@ describe('createYoutubeProducerRuntime', () => {
     const youtube = createMockYoutubeClient(listener)
     const createYoutubeClient = vi.fn(() => youtube)
     const fetch = vi.fn(async () => new Response(null, { status: 201 }))
-    const { logger, info } = createLogger()
+    const { logger } = createLogger()
 
     const runtime = createYoutubeProducerRuntime(
       {
@@ -222,22 +265,6 @@ describe('createYoutubeProducerRuntime', () => {
       text: 'Hello world'
     })
     expect(parsedBody).not.toHaveProperty('skipQna')
-    expect(info).toHaveBeenCalledWith(
-      'YouTube producer started',
-      expect.objectContaining({
-        channelId: 'channel-1',
-        liveVideoId: 'video-1',
-        liveChatId: 'live-chat-1'
-      })
-    )
-    expect(info).toHaveBeenCalledWith(
-      'YouTube chat message received',
-      expect.objectContaining({
-        messageId: 'msg-1',
-        viewerMessage: 'Hello world',
-        messageSource: 'realtime'
-      })
-    )
   })
 
   it('treats 200 responses from chat ingest as success', async () => {
@@ -327,7 +354,7 @@ describe('createYoutubeProducerRuntime', () => {
 
   it('stops the active listener during shutdown', async () => {
     const listener = createMockYoutubeListener()
-    const { logger, info } = createLogger()
+    const { logger } = createLogger()
 
     const runtime = createYoutubeProducerRuntime(
       {
@@ -347,13 +374,6 @@ describe('createYoutubeProducerRuntime', () => {
     await runtime.stop()
 
     expect(listener.stop).toHaveBeenCalledTimes(1)
-    expect(info).toHaveBeenCalledWith(
-      'YouTube producer stopped',
-      expect.objectContaining({
-        channelId: 'channel-1',
-        liveVideoId: 'video-1'
-      })
-    )
   })
 
   it('throws on start when no OAuth token or token resolver is available', async () => {
@@ -378,11 +398,13 @@ describe('createYoutubeProducerRuntime', () => {
   it('sends a Q&A answer returned by chat ingest and records the action', async () => {
     const listener = createMockYoutubeListener()
     const youtube = createMockYoutubeClient(listener)
+    const { logger, info } = createLogger()
     const fetch = vi.fn(async () =>
       new Response(
         JSON.stringify(
           createIngestResponse({
             qna: {
+              agent: 'qna',
               matched: true,
               action: 'SEND_ANSWER',
               answer: 'The replay starts at 8 PM.',
@@ -404,7 +426,7 @@ describe('createYoutubeProducerRuntime', () => {
       {
         createYoutubeClient: vi.fn(() => youtube),
         fetch,
-        logger: createLogger().logger
+        logger
       }
     )
 
@@ -429,6 +451,15 @@ describe('createYoutubeProducerRuntime', () => {
         authorExternalId: 'author-1',
         qnaEntryId: 'qna-1',
         status: 'succeeded'
+      })
+    )
+    expect(info).toHaveBeenCalledWith(
+      'Q&A response sent',
+      expect.objectContaining({
+        messageId: 'msg-1',
+        liveChatId: 'live-chat-1',
+        responseAgent: 'qna',
+        qnaEntryId: 'qna-1'
       })
     )
   })
@@ -503,6 +534,7 @@ describe('createYoutubeProducerRuntime', () => {
               command: { id: 'command-1', trigger: '!linktree' }
             },
             qna: {
+              agent: 'qna',
               matched: true,
               action: 'SEND_ANSWER',
               answer: 'Q&A reply',
@@ -568,6 +600,7 @@ describe('createYoutubeProducerRuntime', () => {
               entry: { id: 'qna-1' }
             },
             moderation: {
+              agent: 'evo-moderation',
               action: 'BAN',
               catalogId: 'SCAM',
               reason: 'Phishing link'
@@ -659,7 +692,7 @@ describe('createYoutubeProducerRuntime', () => {
     })
   })
 
-  it('includes the viewer message in the resolved action log', async () => {
+  it('logs normalize, ban, and timeout stage results for moderation workflow', async () => {
     const listener = createMockYoutubeListener()
     const youtube = createMockYoutubeClient(listener)
     const fetch = vi.fn(async () =>
@@ -667,6 +700,7 @@ describe('createYoutubeProducerRuntime', () => {
         JSON.stringify(
           createIngestResponse({
             moderation: {
+              agent: 'evo-moderation',
               action: 'IGNORE',
               catalogId: null,
               reason: 'No violation'
@@ -698,13 +732,41 @@ describe('createYoutubeProducerRuntime', () => {
     )
 
     expect(info).toHaveBeenCalledWith(
-      'YouTube chat action resolved',
+      'Normalize agent resolved',
       expect.objectContaining({
         messageId: 'msg-1',
         viewerMessage: 'valla mi bu mesaj gorunsun',
-        selectedAction: 'NONE',
-        moderationAction: 'IGNORE',
-        qnaAction: null
+        moderationAgent: 'evo-moderation',
+        stageAgent: 'normalize',
+        unicodeCount: 0,
+        normalized: false,
+        normalizedMessage: 'Hello world'
+      })
+    )
+    expect(info).toHaveBeenCalledWith(
+      'Ban agent resolved',
+      expect.objectContaining({
+        messageId: 'msg-1',
+        viewerMessage: 'valla mi bu mesaj gorunsun',
+        moderationAgent: 'evo-moderation',
+        stageAgent: 'ban',
+        skipped: false,
+        action: 'IGNORE',
+        catalogId: null,
+        reason: 'No violation'
+      })
+    )
+    expect(info).toHaveBeenCalledWith(
+      'Timeout agent resolved',
+      expect.objectContaining({
+        messageId: 'msg-1',
+        viewerMessage: 'valla mi bu mesaj gorunsun',
+        moderationAgent: 'evo-moderation',
+        stageAgent: 'timeout',
+        skipped: false,
+        action: 'IGNORE',
+        catalogId: null,
+        reason: 'No violation'
       })
     )
   })
@@ -781,7 +843,7 @@ describe('createYoutubeProducerRuntime', () => {
       .fn(async () => 'resolved-token-1')
       .mockResolvedValueOnce('resolved-token-1')
       .mockResolvedValueOnce('resolved-token-2')
-    const { logger, info, warn, error } = createLogger()
+    const { logger, warn, error } = createLogger()
 
     const runtime = createYoutubeProducerRuntime(
       {
@@ -815,13 +877,6 @@ describe('createYoutubeProducerRuntime', () => {
         liveVideoId: 'video-1',
         status: 401,
         reason: 'authError'
-      })
-    )
-    expect(info).toHaveBeenCalledWith(
-      'Recovered YouTube chat listener after authorization failure',
-      expect.objectContaining({
-        channelId: 'channel-1',
-        recoveryAttempt: 1
       })
     )
     expect(error).not.toHaveBeenCalledWith(
@@ -973,7 +1028,7 @@ describe('createYoutubeProducerRuntime', () => {
     const listener = createMockYoutubeListener()
     const youtube = createMockYoutubeClient(listener)
     const fetch = vi.fn(async () => new Response(null, { status: 201 }))
-    const { logger, info, warn } = createLogger()
+    const { logger } = createLogger()
 
     let resolveStart!: (value: { liveChatId: string; liveVideoId: string }) => void
     listener.start = vi.fn(
@@ -1029,35 +1084,5 @@ describe('createYoutubeProducerRuntime', () => {
       skipQna: true
     })
 
-    expect(warn).not.toHaveBeenCalledWith(
-      'Skipping YouTube chat message because liveChatId is not available',
-      expect.anything()
-    )
-
-    expect(info).toHaveBeenCalledWith(
-      'Flushing 2 buffered startup-history messages',
-      expect.objectContaining({
-        channelId: 'channel-1',
-        liveVideoId: 'video-1',
-        liveChatId: 'live-chat-1'
-      })
-    )
-
-    expect(info).toHaveBeenCalledWith(
-      'YouTube chat message received',
-      expect.objectContaining({
-        messageId: 'msg-history-1',
-        viewerMessage: 'Hello world',
-        messageSource: 'history'
-      })
-    )
-    expect(info).toHaveBeenCalledWith(
-      'YouTube chat message received',
-      expect.objectContaining({
-        messageId: 'msg-history-2',
-        viewerMessage: 'Hello world',
-        messageSource: 'history'
-      })
-    )
   })
 })

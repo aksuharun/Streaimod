@@ -25,13 +25,17 @@ function createRuntimeFactory() {
 }
 
 describe('stream-runtime-service', () => {
+  let infoSpy: ReturnType<typeof vi.spyOn>
+
   beforeEach(() => {
     clearManagedStreamRuntimesForTest()
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
   })
 
   afterEach(async () => {
     await stopAllManagedStreamRuntimes()
     clearManagedStreamRuntimesForTest()
+    infoSpy.mockRestore()
   })
 
   it('starts and reports a managed runtime for the channel', async () => {
@@ -64,6 +68,10 @@ describe('stream-runtime-service', () => {
         streamId: 'stream-1'
       })
     )
+    expect(infoSpy).toHaveBeenCalledWith('Moderation started', {
+      channelId: 'channel-1',
+      streamId: 'stream-1'
+    })
     expect(getManagedStreamRuntimeStatus('channel-1')).toEqual(status)
   })
 
@@ -91,6 +99,7 @@ describe('stream-runtime-service', () => {
     expect(runtimeFactory).toHaveBeenCalledTimes(1)
     expect(runtimes[0]?.start).toHaveBeenCalledTimes(1)
     expect(runtimes[0]?.stop).not.toHaveBeenCalled()
+    expect(infoSpy).toHaveBeenCalledTimes(1)
   })
 
   it('replaces an existing runtime when a different live stream is started', async () => {
@@ -117,6 +126,14 @@ describe('stream-runtime-service', () => {
     expect(runtimeFactory).toHaveBeenCalledTimes(2)
     expect(runtimes[0]?.stop).toHaveBeenCalledTimes(1)
     expect(runtimes[1]?.start).toHaveBeenCalledTimes(1)
+    expect(infoSpy).toHaveBeenNthCalledWith(2, 'Moderation stopped', {
+      channelId: 'channel-1',
+      streamId: 'stream-1'
+    })
+    expect(infoSpy).toHaveBeenNthCalledWith(3, 'Moderation started', {
+      channelId: 'channel-1',
+      streamId: 'stream-2'
+    })
     expect(getManagedStreamRuntimeStatus('channel-1')).toEqual(
       expect.objectContaining({
         active: true,
@@ -145,6 +162,10 @@ describe('stream-runtime-service', () => {
       channelId: 'channel-1',
       streamId: null,
       startedAt: null
+    })
+    expect(infoSpy).toHaveBeenLastCalledWith('Moderation stopped', {
+      channelId: 'channel-1',
+      streamId: 'stream-1'
     })
   })
 })

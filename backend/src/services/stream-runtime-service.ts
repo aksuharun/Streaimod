@@ -20,6 +20,20 @@ type RuntimeFactory = typeof createYoutubeProducerRuntime
 
 const managedRuntimes = new Map<string, ManagedRuntimeRecord>()
 
+function logModerationStarted(channelId: string, streamId: string): void {
+  console.info('Moderation started', {
+    channelId,
+    streamId
+  })
+}
+
+function logModerationStopped(channelId: string, streamId: string): void {
+  console.info('Moderation stopped', {
+    channelId,
+    streamId
+  })
+}
+
 function createAccessTokenResolver(channelId: string): () => Promise<string> {
   return async () => {
     const user = await User.findOne({ 'channels.channelId': channelId }).exec()
@@ -64,21 +78,13 @@ export async function startManagedStreamRuntime(
   const existing = managedRuntimes.get(input.channelId)
 
   if (existing && existing.streamId === input.streamId) {
-    console.info('Managed stream runtime already active', {
-      channelId: input.channelId,
-      streamId: input.streamId
-    })
     return getManagedStreamRuntimeStatus(input.channelId)
   }
 
   if (existing) {
-    console.info('Replacing managed stream runtime', {
-      channelId: input.channelId,
-      previousStreamId: existing.streamId,
-      nextStreamId: input.streamId
-    })
     await existing.runtime.stop()
     managedRuntimes.delete(input.channelId)
+    logModerationStopped(input.channelId, existing.streamId)
   }
 
   const runtime = runtimeFactory({
@@ -91,11 +97,6 @@ export async function startManagedStreamRuntime(
   })
 
   try {
-    console.info('Starting managed stream runtime', {
-      channelId: input.channelId,
-      streamId: input.streamId,
-      ingestUrl: input.ingestUrl
-    })
     await runtime.start()
   } catch (error) {
     await runtime.stop().catch(() => undefined)
@@ -108,6 +109,7 @@ export async function startManagedStreamRuntime(
     streamId: input.streamId,
     startedAt: new Date().toISOString()
   })
+  logModerationStarted(input.channelId, input.streamId)
 
   return getManagedStreamRuntimeStatus(input.channelId)
 }
@@ -116,16 +118,12 @@ export async function stopManagedStreamRuntime(channelId: string): Promise<Strea
   const existing = managedRuntimes.get(channelId)
 
   if (!existing) {
-    console.info('Managed stream runtime already stopped', { channelId })
     return getManagedStreamRuntimeStatus(channelId)
   }
 
   managedRuntimes.delete(channelId)
-  console.info('Stopping managed stream runtime', {
-    channelId,
-    streamId: existing.streamId
-  })
   await existing.runtime.stop()
+  logModerationStopped(channelId, existing.streamId)
 
   return getManagedStreamRuntimeStatus(channelId)
 }

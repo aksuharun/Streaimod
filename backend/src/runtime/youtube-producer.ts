@@ -69,15 +69,30 @@ interface ChatIngestResponse {
     command?: { id: string; trigger: string }
   } | null
   qna: {
+    agent?: string
     matched: boolean
     action: 'SEND_ANSWER' | 'DO_NOTHING'
     answer?: string
     entry?: { id: string }
   } | null
   moderation: {
+    agent?: string
     action: 'BAN' | 'TIMEOUT' | 'IGNORE'
     catalogId: string | null
     reason: string | null
+    workflow?: {
+      unicodeCount: number
+      normalized: boolean
+      normalizedMessage: string
+      banSkipped: boolean
+      banAction: 'BAN' | 'TIMEOUT' | 'IGNORE' | null
+      banCatalogId: string | null
+      banReason: string | null
+      timeoutSkipped: boolean
+      timeoutAction: 'BAN' | 'TIMEOUT' | 'IGNORE' | null
+      timeoutCatalogId: string | null
+      timeoutReason: string | null
+    }
   } | null
 }
 
@@ -108,6 +123,38 @@ function truncateForLog(value: string, maxLength = 120): string {
   }
 
   return `${trimmed.slice(0, maxLength - 3)}...`
+}
+
+function logModerationWorkflowStage({
+  logger,
+  stage,
+  message,
+  liveChatId,
+  moderationAgent,
+  payload
+}: {
+  logger: YoutubeProducerLogger
+  stage: 'normalize' | 'ban' | 'timeout'
+  message: YoutubeChatMessage
+  liveChatId: string
+  moderationAgent: string | null
+  payload: Record<string, unknown>
+}): void {
+  const label =
+    stage === 'normalize'
+      ? 'Normalize agent resolved'
+      : stage === 'ban'
+        ? 'Ban agent resolved'
+        : 'Timeout agent resolved'
+
+  logger.info(label, {
+    messageId: message.id,
+    liveChatId,
+    viewerMessage: truncateForLog(message.text, 200),
+    moderationAgent,
+    stageAgent: stage,
+    ...payload
+  })
 }
 
 function extractYoutubePlatformErrorDetail(error: unknown): YoutubePlatformErrorDetail {
@@ -225,8 +272,7 @@ function createDefaultDependencies(): YoutubeProducerDependencies {
 async function postToChatIngest(
   payload: ChatIngestPayload,
   config: YoutubeProducerConfig,
-  dependencies: YoutubeProducerDependencies,
-  messageSource: 'history' | 'realtime'
+  dependencies: YoutubeProducerDependencies
 ): Promise<ChatIngestResponse | null> {
   const response = await dependencies.fetch(config.ingestUrl, {
     method: 'POST',
@@ -240,11 +286,6 @@ async function postToChatIngest(
     const responseText = await response.text()
 
     if (!responseText.trim()) {
-      dependencies.logger.info('Chat ingest returned an empty success response', {
-        channelId: payload.channelId,
-        messageId: payload.messageId,
-        status: response.status
-      })
       return null
     }
 
@@ -266,19 +307,8 @@ async function handleYoutubeMessage(
   liveChatId: string,
   getChatClient: () => Promise<YoutubeChatClient>,
   actionsEnabled: boolean,
-  skipQna: boolean = false,
-  messageSource: 'history' | 'realtime' = 'realtime'
+  skipQna: boolean = false
 ): Promise<void> {
-  dependencies.logger.info('YouTube chat message received', {
-    messageId: message.id,
-    liveVideoId: config.liveVideoId,
-    authorExternalId: message.author.id,
-    channelExternalId: message.channel.id,
-    sentAt: message.sentAt,
-    viewerMessage: truncateForLog(message.text, 200),
-    messageSource
-  })
-
   if (!isNonEmptyString(message.author.id)) {
     dependencies.logger.warn(
       'Skipping YouTube chat message because author.id is missing',
@@ -305,16 +335,6 @@ async function handleYoutubeMessage(
   const channelExternalId = message.channel.id
 
   if (authorId === channelExternalId) {
-    dependencies.logger.info(
-      'Skipping YouTube chat message because it was sent by the streamer',
-      {
-        messageId: message.id,
-        liveVideoId: config.liveVideoId,
-        authorExternalId: authorId,
-        channelExternalId,
-        messageSource
-      }
-    )
     return
   }
 
@@ -330,8 +350,7 @@ async function handleYoutubeMessage(
       ...(skipQna ? { skipQna: true } : {})
     },
     config,
-    dependencies,
-    messageSource
+    dependencies
   )
 
   await executeIngestActions({
@@ -354,11 +373,6 @@ async function executeReservedAction<TResponse>(
   const reservation = await reserveChatAction(actionInput)
 
   if (!reservation.reserved) {
-    logger.info('Skipping duplicate YouTube chat action', {
-      actionType: actionInput.type,
-      messageId: actionInput.messageId,
-      platform: actionInput.platform
-    })
     return { executed: false }
   }
 
@@ -392,11 +406,6 @@ async function executeIngestActions({
   logger: YoutubeProducerLogger
 }): Promise<void> {
   if (!ingestResult || ingestResult.duplicate) {
-    logger.info('Skipping action execution for duplicate or empty ingest result', {
-      messageId: message.id,
-      liveChatId,
-      duplicate: ingestResult?.duplicate ?? null
-    })
     return
   }
 
@@ -454,31 +463,52 @@ async function executeIngestActions({
     return
   }
 
-  logger.info('YouTube chat action resolved', {
-    messageId: message.id,
-    liveChatId,
-    viewerMessage: truncateForLog(message.text, 200),
-    selectedAction,
-    moderationAction: moderation?.action ?? null,
-    moderationReason: moderation?.reason ?? null,
-    moderationCatalogId: moderation?.catalogId ?? null,
-    commandMatched: command?.matched ?? false,
-    commandId: command?.command?.id ?? null,
-    commandTrigger: command?.command?.trigger ?? null,
-    qnaMatched: qna?.matched ?? false,
-    qnaAction: qna?.action ?? null,
-    qnaEntryId: qna?.entry?.id ?? null
-  })
+  if (moderation?.workflow) {
+    logModerationWorkflowStage({
+      logger,
+      stage: 'normalize',
+      message,
+      liveChatId,
+      moderationAgent: moderation.agent ?? null,
+      payload: {
+        unicodeCount: moderation.workflow.unicodeCount,
+        normalized: moderation.workflow.normalized,
+        normalizedMessage: moderation.workflow.normalizedMessage
+      }
+    })
+
+    logModerationWorkflowStage({
+      logger,
+      stage: 'ban',
+      message,
+      liveChatId,
+      moderationAgent: moderation.agent ?? null,
+      payload: {
+        skipped: moderation.workflow.banSkipped,
+        action: moderation.workflow.banAction,
+        catalogId: moderation.workflow.banCatalogId,
+        reason: moderation.workflow.banReason
+      }
+    })
+
+    logModerationWorkflowStage({
+      logger,
+      stage: 'timeout',
+      message,
+      liveChatId,
+      moderationAgent: moderation.agent ?? null,
+      payload: {
+        skipped: moderation.workflow.timeoutSkipped,
+        action: moderation.workflow.timeoutAction,
+        catalogId: moderation.workflow.timeoutCatalogId,
+        reason: moderation.workflow.timeoutReason
+      }
+    })
+  }
 
   const chatClient = await getChatClient()
 
   if (moderation?.action === 'BAN') {
-    logger.info('Executing YouTube ban action', {
-      messageId: message.id,
-      liveChatId,
-      authorExternalId: authorId,
-      catalogId: moderation.catalogId
-    })
     await executeReservedAction(
       {
         ...baseActionInput,
@@ -497,11 +527,6 @@ async function executeIngestActions({
         }),
       logger
     )
-    logger.info('Completed YouTube ban action', {
-      messageId: message.id,
-      liveChatId,
-      authorExternalId: authorId
-    })
     return
   }
 
@@ -509,13 +534,6 @@ async function executeIngestActions({
     const durationSeconds =
       config.timeoutDurationSeconds ?? DEFAULT_TIMEOUT_DURATION_SECONDS
 
-    logger.info('Executing YouTube timeout action', {
-      messageId: message.id,
-      liveChatId,
-      authorExternalId: authorId,
-      catalogId: moderation.catalogId,
-      durationSeconds
-    })
     await executeReservedAction(
       {
         ...baseActionInput,
@@ -536,23 +554,10 @@ async function executeIngestActions({
         }),
       logger
     )
-    logger.info('Completed YouTube timeout action', {
-      messageId: message.id,
-      liveChatId,
-      authorExternalId: authorId,
-      durationSeconds
-    })
     return
   }
 
   if (commandReplyText !== null) {
-    logger.info('Executing YouTube command reply', {
-      messageId: message.id,
-      liveChatId,
-      commandId: command?.command?.id ?? null,
-      commandTrigger: command?.command?.trigger ?? null,
-      textPreview: truncateForLog(commandReplyText)
-    })
     await executeReservedAction(
       {
         ...baseActionInput,
@@ -572,12 +577,6 @@ async function executeIngestActions({
         }),
       logger
     )
-    logger.info('Completed YouTube command reply', {
-      messageId: message.id,
-      liveChatId,
-      commandId: command?.command?.id ?? null,
-      commandTrigger: command?.command?.trigger ?? null
-    })
     return
   }
 
@@ -585,13 +584,7 @@ async function executeIngestActions({
     const replyText = qnaReplyText
     const qnaEntryId = qna?.entry?.id ?? null
 
-    logger.info('Executing YouTube Q&A reply', {
-      messageId: message.id,
-      liveChatId,
-      qnaEntryId,
-      textPreview: truncateForLog(replyText)
-    })
-    await executeReservedAction(
+    const actionResult = await executeReservedAction(
       {
         ...baseActionInput,
         type: 'qna_reply',
@@ -608,11 +601,17 @@ async function executeIngestActions({
         }),
       logger
     )
-    logger.info('Completed YouTube Q&A reply', {
-      messageId: message.id,
-      liveChatId,
-      qnaEntryId
-    })
+
+    if (actionResult.executed) {
+      logger.info('Q&A response sent', {
+        messageId: message.id,
+        liveChatId,
+        responseAgent: qna?.agent ?? null,
+        qnaEntryId,
+        textPreview: truncateForLog(replyText)
+      })
+    }
+
     return
   }
 
@@ -847,32 +846,7 @@ export function createYoutubeProducerRuntime(
 
           liveChatId = startResult.liveChatId
 
-          dependencies.logger.info(
-            recoveryAttempt === null
-              ? 'YouTube producer started'
-              : 'Recovered YouTube chat listener after authorization failure',
-            {
-              channelId: config.channelId,
-              liveVideoId: startResult.liveVideoId ?? config.liveVideoId,
-              liveChatId: startResult.liveChatId,
-              ingestUrl: config.ingestUrl,
-              includeHistory: config.includeHistory ?? true,
-              pollingIntervalMs: config.pollingIntervalMs ?? null,
-              maxResults: config.maxResults ?? null,
-              recoveryAttempt
-            }
-          )
-
           if (bufferedMessages.length > 0) {
-            dependencies.logger.info(
-              `Flushing ${bufferedMessages.length} buffered startup-history messages`,
-              {
-                channelId: config.channelId,
-                liveVideoId: config.liveVideoId,
-                liveChatId: startResult.liveChatId
-              }
-            )
-
             const messagesToFlush = bufferedMessages.splice(0, bufferedMessages.length)
             for (const bufferedMessage of messagesToFlush) {
               try {
@@ -883,8 +857,7 @@ export function createYoutubeProducerRuntime(
                   liveChatId,
                   getActionChatClient,
                   true,
-                  true,
-                  'history'
+                  true
                 )
               } catch (error) {
                 dependencies.logger.error(
@@ -932,11 +905,6 @@ export function createYoutubeProducerRuntime(
       liveChatId = null
 
       await activeListener.stop()
-
-      dependencies.logger.info('YouTube producer stopped', {
-        channelId: config.channelId,
-        liveVideoId: config.liveVideoId
-      })
     }
   }
 }

@@ -207,12 +207,6 @@ export async function ingestChat(
       throw error
     }
 
-    console.info('Skipping duplicate chat message', {
-      channelId: normalized.channelId,
-      platform: normalized.platform,
-      messageId: normalized.messageId
-    })
-
     return {
       duplicate: true,
       event: existing,

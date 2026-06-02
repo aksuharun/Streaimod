@@ -205,11 +205,7 @@ export class OpenAIQnaAgentModel implements QnaAgentModel {
       fetcher: this.fetcher
     })
 
-    console.info('Raw Q&A agent structured response from OpenAI', { content })
-
     const decision = parseQnaAgentDecision(content)
-
-    console.info('Parsed Q&A agent response', { question: decision.question, response: decision.response })
 
     return decision
   }
@@ -285,11 +281,6 @@ export async function runQnaAgentWorkflow(
     qnaEntries
   })
 
-  console.info('Q&A agent parsed decision response', {
-    question: decision.question,
-    response: decision.response
-  })
-
   const responseText = decision.response.trim()
   const matchedQuestion = decision.question.trim()
   const normalizedMatchQuestion = normalizeQuestionText(matchedQuestion)
@@ -331,14 +322,6 @@ export async function runQnaAgentWorkflow(
 
   const doNothingReason: Exclude<QnaAgentReason, 'ANSWER_FOUND'> =
     matchedQuestion.length > 0 ? 'INVALID_AGENT_SELECTION' : 'NO_DATABASE_MATCH'
-
-  console.info('Q&A agent workflow outcome: DO_NOTHING', {
-    reason: doNothingReason,
-    question: decision.question,
-    responseText,
-    hasSelectedEntry: !!selectedEntry,
-    selectedEntryId: baseWorkflow.selectedEntryId
-  })
 
   return buildDoNothingResult(baseWorkflow, doNothingReason)
 }
