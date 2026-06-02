@@ -348,8 +348,10 @@ export class OpenAIEvoModerationStageModel implements EvoModerationStageModel {
   async decide(input: EvoModerationStageModelInput): Promise<EvoModerationStageDecision> {
     const actionEnum =
       input.stageType === 'ban' ? ['BAN', 'IGNORE'] : ['TIMEOUT', 'IGNORE']
-    const categoryIdEnum = [...input.allowedCategoryIds, 'NONE']
-    const schemaName = `${input.stageType}_response`
+    const actionDescription =
+      input.stageType === 'ban'
+        ? 'The action taken, either BAN or IGNORE.'
+        : 'The action taken, either TIMEOUT or IGNORE.'
 
     const content = await createChatCompletion({
       messages: [
@@ -359,24 +361,28 @@ export class OpenAIEvoModerationStageModel implements EvoModerationStageModel {
       response_format: {
         type: 'json_schema',
         json_schema: {
-          name: schemaName,
+          name: 'reason_action',
           strict: true,
           schema: {
             type: 'object',
             properties: {
-              action: {
+              reason: {
                 type: 'string',
-                enum: actionEnum
+                description: 'A description explaining why the action occurred.',
+                minLength: 1
               },
               category_id: {
                 type: 'string',
-                enum: categoryIdEnum
+                description: 'Unique identifier for the category.',
+                minLength: 1
               },
-              reason: {
-                type: 'string'
+              action: {
+                type: 'string',
+                description: actionDescription,
+                enum: actionEnum
               }
             },
-            required: ['action', 'category_id', 'reason'],
+            required: ['reason', 'category_id', 'action'],
             additionalProperties: false
           }
         }

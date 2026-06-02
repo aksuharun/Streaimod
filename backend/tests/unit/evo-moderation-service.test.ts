@@ -470,19 +470,36 @@ describe('OpenAIEvoModerationStageModel', () => {
     const format = body.response_format as Record<string, unknown>
     expect(format.type).toBe('json_schema')
 
-    const schema = (format.json_schema as Record<string, unknown>)
+    const jsonSchema = format.json_schema as Record<string, unknown>
+    expect(jsonSchema.name).toBe('reason_action')
+    expect(jsonSchema.strict).toBe(true)
+
+    const schema = (jsonSchema as Record<string, unknown>)
       .schema as Record<string, unknown>
     const properties = schema.properties as Record<string, unknown>
+    const reasonProp = properties.reason as Record<string, unknown>
     const actionProp = properties.action as Record<string, unknown>
     const categoryIdProp = properties.category_id as Record<string, unknown>
 
+    expect(reasonProp.description).toBe(
+      'A description explaining why the action occurred.'
+    )
+    expect(reasonProp.minLength).toBe(1)
+    expect(categoryIdProp.description).toBe(
+      'Unique identifier for the category.'
+    )
+    expect(categoryIdProp.minLength).toBe(1)
+    expect(actionProp.description).toBe(
+      'The action taken, either BAN or IGNORE.'
+    )
     expect(actionProp.enum).toEqual(['BAN', 'IGNORE'])
-    expect(categoryIdProp.enum).toEqual(['SCAM', 'THREAT', 'NONE'])
   })
 
   it('sends a timeout request with TIMEOUT action enum', async () => {
-    const fetcher: typeof fetch = async () =>
-      new Response(
+    const requests: Array<{ init?: RequestInit }> = []
+    const fetcher: typeof fetch = async (_input, init) => {
+      requests.push({ init })
+      return new Response(
         JSON.stringify({
           choices: [
             {
@@ -498,6 +515,7 @@ describe('OpenAIEvoModerationStageModel', () => {
         }),
         { status: 200 }
       )
+    }
     const model = new OpenAIEvoModerationStageModel(fetcher)
 
     const result = await withTemporaryEnv(
@@ -516,6 +534,21 @@ describe('OpenAIEvoModerationStageModel', () => {
       categoryId: 'INSULT',
       reason: 'Name-calling'
     })
+
+    const body = JSON.parse(
+      String(requests[0]?.init?.body)
+    ) as Record<string, unknown>
+    const format = body.response_format as Record<string, unknown>
+    const jsonSchema = format.json_schema as Record<string, unknown>
+    const schema = jsonSchema.schema as Record<string, unknown>
+    const properties = schema.properties as Record<string, unknown>
+    const actionProp = properties.action as Record<string, unknown>
+
+    expect(jsonSchema.name).toBe('reason_action')
+    expect(actionProp.description).toBe(
+      'The action taken, either TIMEOUT or IGNORE.'
+    )
+    expect(actionProp.enum).toEqual(['TIMEOUT', 'IGNORE'])
   })
 
   it('converts invalid action to IGNORE', async () => {
