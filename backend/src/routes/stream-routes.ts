@@ -1,10 +1,12 @@
 import { type Application, type Express, Router } from 'express'
+import { PlatformApiError } from 'unified-creator-metrics'
 
 import {
   getAuthenticatedUser,
   requireAuthenticatedUser,
   resolveOwnedChannelId
 } from '../middleware/auth.js'
+import { GoogleAuthServiceError } from '../services/google-auth-service.js'
 import { hasEnabledModerationCategories } from '../services/moderation-category-service.js'
 import { getStreamOverview } from '../services/livestream-service.js'
 import {
@@ -90,6 +92,124 @@ function resolveIngestBaseUrl(request: { protocol: string; get(name: string): st
 
 function shouldForceStreamRefresh(value: unknown): boolean {
   return value === 'true' || value === '1'
+}
+
+interface PlatformErrorDetail {
+  status: number | null
+  reason: string | null
+  message: string | null
+}
+
+function extractPlatformErrorDetail(error: unknown): PlatformErrorDetail {
+  const fallbackMessage = error instanceof Error ? error.message.trim() : null
+
+  if (!(error instanceof PlatformApiError)) {
+    return {
+      status: null,
+      reason: null,
+      message: fallbackMessage
+    }
+  }
+
+  const fallbackStatus = typeof error.status === 'number' ? error.status : null
+  const cause = error.cause
+
+  if (!cause || typeof cause !== 'object') {
+    return {
+      status: fallbackStatus,
+      reason: null,
+      message: fallbackMessage
+    }
+  }
+
+  const causeRecord = cause as Record<string, unknown>
+  const response =
+    causeRecord.response && typeof causeRecord.response === 'object'
+      ? (causeRecord.response as Record<string, unknown>)
+      : null
+  const responseData =
+    response?.data && typeof response.data === 'object'
+      ? (response.data as Record<string, unknown>)
+      : null
+  const topLevelError =
+    responseData?.error && typeof responseData.error === 'object'
+      ? (responseData.error as Record<string, unknown>)
+      : null
+  const errors = Array.isArray(topLevelError?.errors)
+    ? topLevelError.errors
+    : Array.isArray(responseData?.errors)
+      ? responseData.errors
+      : []
+  const firstError =
+    errors[0] && typeof errors[0] === 'object' ? (errors[0] as Record<string, unknown>) : null
+  const status =
+    typeof response?.status === 'number'
+      ? response.status
+      : typeof causeRecord.status === 'number'
+        ? causeRecord.status
+        : fallbackStatus
+  const reason =
+    typeof firstError?.reason === 'string' && firstError.reason.trim().length > 0
+      ? firstError.reason.trim()
+      : null
+  const message =
+    typeof topLevelError?.message === 'string' && topLevelError.message.trim().length > 0
+      ? topLevelError.message.trim()
+      : typeof causeRecord.message === 'string' && causeRecord.message.trim().length > 0
+        ? causeRecord.message.trim()
+        : fallbackMessage
+
+  return {
+    status,
+    reason,
+    message
+  }
+}
+
+function buildStreamStartErrorMessage(error: unknown): string {
+  if (error instanceof GoogleAuthServiceError) {
+    if (
+      error.code === 'REFRESH_TOKEN_MISSING' ||
+      error.code === 'TOKEN_REFRESH_FAILED'
+    ) {
+      return 'Google authorization has expired or is incomplete. Sign in again and retry.'
+    }
+
+    return error.message
+  }
+
+  const detail = extractPlatformErrorDetail(error)
+  const reason = detail.reason?.toLowerCase() ?? null
+
+  if (
+    detail.status === 401 ||
+    reason === 'autherror' ||
+    reason === 'insufficientpermissions'
+  ) {
+    return 'Google authorization is missing the required YouTube live chat access. Sign in again and retry.'
+  }
+
+  if (
+    reason === 'accessnotconfigured' ||
+    reason === 'servicedisabled' ||
+    reason === 'api_disabled'
+  ) {
+    return 'The YouTube Data API is not enabled for this Google Cloud project.'
+  }
+
+  if (
+    reason === 'livechatdisabled' ||
+    reason === 'livechatended' ||
+    reason === 'livebroadcastnotfound'
+  ) {
+    return detail.message ?? 'The selected stream does not have an active YouTube live chat.'
+  }
+
+  if (detail.message) {
+    return detail.message
+  }
+
+  return 'Unable to start live moderation right now. Check the backend logs and try again.'
 }
 
 streamsRouter.get('/', requireAuthenticatedUser, async (request_, response, next) => {
@@ -202,7 +322,15 @@ streamRuntimeRouter.post('/start', async (request_, response, next) => {
 
     response.status(200).json(status)
   } catch (error) {
-    next(error)
+    console.error('Failed to start stream runtime', {
+      method: request_.method,
+      path: request_.originalUrl,
+      error
+    })
+
+    response.status(502).json({
+      error: buildStreamStartErrorMessage(error)
+    })
   }
 })
 

@@ -63,6 +63,12 @@ const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => 
     return
   }
 
+  console.error('Unhandled backend error', {
+    method: _request.method,
+    path: _request.originalUrl,
+    error
+  })
+
   response.status(500).json({ error: 'Internal server error' })
 }
 

@@ -1,6 +1,7 @@
 import request from 'supertest'
 
 import { setStreamRouteDependencies } from '../../src/routes/stream-routes.js'
+import { GoogleAuthServiceError } from '../../src/services/google-auth-service.js'
 import type { StreamOverviewDto } from '../../src/services/livestream-service.js'
 import { createTestApp } from '../helpers/test-app.js'
 
@@ -166,6 +167,79 @@ describe('stream routes', () => {
 
     expect(response.body).toEqual({
       error: 'Active stream not found for the selected channel'
+    })
+  })
+
+  it('returns a helpful auth error when starting moderation needs reauthentication', async () => {
+    const app = createTestApp((expressApp) => {
+      setStreamRouteDependencies(expressApp, {
+        getStreamOverview: vi.fn(async (): Promise<StreamOverviewDto> => ({
+          active: [
+            {
+              id: 'live-video-1',
+              platform: 'youtube' as const,
+              title: 'Live stream',
+              status: 'live' as const,
+              viewerCount: 128,
+              startsAt: '2026-05-31T12:00:00.000Z',
+              fetchedAt: '2026-05-31T12:01:00.000Z'
+            }
+          ],
+          scheduled: [],
+          fetchedAt: '2026-05-31T12:01:00.000Z'
+        })),
+        hasEnabledModerationCategories: vi.fn(async () => true),
+        startManagedStreamRuntime: vi.fn(async () => {
+          throw new GoogleAuthServiceError(
+            'TOKEN_REFRESH_FAILED',
+            'Refresh token is invalid'
+          )
+        })
+      })
+    })
+
+    const response = await request(app)
+      .post('/api/stream/start')
+      .send({ streamId: 'live-video-1' })
+      .expect(502)
+
+    expect(response.body).toEqual({
+      error: 'Google authorization has expired or is incomplete. Sign in again and retry.'
+    })
+  })
+
+  it('returns the upstream YouTube message when starting moderation fails', async () => {
+    const app = createTestApp((expressApp) => {
+      setStreamRouteDependencies(expressApp, {
+        getStreamOverview: vi.fn(async (): Promise<StreamOverviewDto> => ({
+          active: [
+            {
+              id: 'live-video-1',
+              platform: 'youtube' as const,
+              title: 'Live stream',
+              status: 'live' as const,
+              viewerCount: 128,
+              startsAt: '2026-05-31T12:00:00.000Z',
+              fetchedAt: '2026-05-31T12:01:00.000Z'
+            }
+          ],
+          scheduled: [],
+          fetchedAt: '2026-05-31T12:01:00.000Z'
+        })),
+        hasEnabledModerationCategories: vi.fn(async () => true),
+        startManagedStreamRuntime: vi.fn(async () => {
+          throw new Error('The selected stream does not have an active YouTube live chat.')
+        })
+      })
+    })
+
+    const response = await request(app)
+      .post('/api/stream/start')
+      .send({ streamId: 'live-video-1' })
+      .expect(502)
+
+    expect(response.body).toEqual({
+      error: 'The selected stream does not have an active YouTube live chat.'
     })
   })
 
