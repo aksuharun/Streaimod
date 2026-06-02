@@ -307,8 +307,8 @@ function AppShell(props: {
         <button type="button" className="brand-block" onClick={() => props.onNavigate('/dashboard')}>
           <BrandLogo />
           <span>
-            <strong>AI Moderator</strong>
-            <small>YouTube moderation</small>
+            <strong>Streaimod</strong>
+            <small>Stream Moderation</small>
           </span>
         </button>
 
@@ -371,8 +371,8 @@ function LandingScreen(props: { onNavigate: (path: AppRoute) => void }) {
           <div className="brand-inline">
             <BrandLogo />
             <div>
-              <strong>AI Moderator</strong>
-              <small>YouTube moderation</small>
+              <strong>Streaimod</strong>
+              <small>Stream Moderation</small>
             </div>
           </div>
 
@@ -431,7 +431,7 @@ function LandingScreen(props: { onNavigate: (path: AppRoute) => void }) {
               </div>
               <div className="chat-message answer">
                 <span className="ai-badge">AI</span>
-                <p><strong>AI Moderator</strong> The replay goes live about 20 minutes after the stream ends.</p>
+                <p><strong>Streaimod</strong> The replay goes live about 20 minutes after the stream ends.</p>
               </div>
               <div className="chat-signal">
                 <span>Configured answer matched</span>
