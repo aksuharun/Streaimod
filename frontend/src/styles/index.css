@@ -1097,6 +1097,61 @@ a {
   justify-content: center;
 }
 
+.feature-action-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.feature-action-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+}
+
+.feature-action-copy,
+.feature-action-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.feature-action-copy {
+  align-items: flex-start;
+}
+
+.feature-action-copy > span:last-child {
+  display: block;
+}
+
+.feature-action-copy strong {
+  display: block;
+  font-size: 0.98rem;
+}
+
+.feature-action-copy small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.feature-action-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  flex: none;
+}
+
 .empty-panel,
 .lane-empty {
   padding: 28px;
@@ -1387,7 +1442,9 @@ tbody td {
   .modal-header,
   .editor-toggle,
   .stream-card,
-  .inline-banner {
+  .inline-banner,
+  .feature-action-copy,
+  .feature-action-controls {
     flex-direction: column;
   }
 
@@ -1409,6 +1466,10 @@ tbody td {
 
   .header-actions {
     justify-content: flex-start;
+  }
+
+  .feature-action-controls {
+    align-items: stretch;
   }
 
   .onboarding-panel {
