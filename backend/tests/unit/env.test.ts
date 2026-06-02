@@ -1,6 +1,7 @@
 import {
   getOptionalEnv,
   getRequiredEnv,
+  resolveMongoUri,
   runBackendStartupPreflight
 } from '../../src/config/env.js'
 import { withTemporaryEnv } from '../helpers/env.js'
@@ -59,3 +60,43 @@ describe('runBackendStartupPreflight', () => {
   })
 })
 
+describe('resolveMongoUri', () => {
+  it('prefers MONGODB_URI when set', async () => {
+    await withTemporaryEnv(
+      {
+        MONGODB_URI: 'mongodb://remote.example.com:27017/prod-db',
+        MONGODB_HOSTPORT: 'mongo:27017',
+        MONGODB_DATABASE: 'ignored-db'
+      },
+      async () => {
+        expect(resolveMongoUri()).toBe('mongodb://remote.example.com:27017/prod-db')
+      }
+    )
+  })
+
+  it('builds a URI from MONGODB_HOSTPORT when needed', async () => {
+    await withTemporaryEnv(
+      {
+        MONGODB_URI: undefined,
+        MONGODB_HOSTPORT: 'mongo:27017',
+        MONGODB_DATABASE: 'ai-mod-prod'
+      },
+      async () => {
+        expect(resolveMongoUri()).toBe('mongodb://mongo:27017/ai-mod-prod')
+      }
+    )
+  })
+
+  it('falls back to the local default when no Mongo env is set', async () => {
+    await withTemporaryEnv(
+      {
+        MONGODB_URI: undefined,
+        MONGODB_HOSTPORT: undefined,
+        MONGODB_DATABASE: undefined
+      },
+      async () => {
+        expect(resolveMongoUri()).toBe('mongodb://localhost:27017/ai-mod')
+      }
+    )
+  })
+})

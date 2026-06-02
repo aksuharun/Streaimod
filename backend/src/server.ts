@@ -3,7 +3,7 @@ import { type Server } from 'node:http'
 import mongoose from 'mongoose'
 
 import { createApp } from './app.js'
-import { getOptionalEnv, runBackendStartupPreflight } from './config/env.js'
+import { resolveMongoUri, runBackendStartupPreflight } from './config/env.js'
 import { seedModerationCatalog } from './services/moderation-catalog-service.js'
 import { assertNoLegacyModerationCategoriesWithoutCatalogId } from './services/moderation-category-service.js'
 import { stopAllManagedStreamRuntimes } from './services/stream-runtime-service.js'
@@ -86,7 +86,7 @@ function registerShutdownHandlers(
 
 async function startServer(): Promise<void> {
   runBackendStartupPreflight()
-  const mongoUri = getOptionalEnv('MONGODB_URI', 'mongodb://localhost:27017/ai-mod')
+  const mongoUri = resolveMongoUri()
 
   await mongoose.connect(mongoUri)
   await seedModerationCatalog()

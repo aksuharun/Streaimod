@@ -31,6 +31,23 @@ export function getOptionalEnv(name: string, fallback: string): string {
   return process.env[name]?.trim() || fallback
 }
 
+export function resolveMongoUri(): string {
+  const configuredUri = process.env.MONGODB_URI?.trim()
+
+  if (configuredUri) {
+    return configuredUri
+  }
+
+  const hostport = process.env.MONGODB_HOSTPORT?.trim()
+
+  if (hostport) {
+    const databaseName = getOptionalEnv('MONGODB_DATABASE', 'ai-mod')
+    return `mongodb://${hostport}/${databaseName}`
+  }
+
+  return 'mongodb://localhost:27017/ai-mod'
+}
+
 export function assertRequiredEnv(names: readonly string[]): void {
   for (const name of names) {
     getRequiredEnv(name)

@@ -4,6 +4,7 @@ coverage/
 .env
 .env.*
 !.env.schema
+!.env.docker.example
 *.log
 legacy-reference/
 .opencode/
@@ -13,3 +14,4 @@ frontend/playwright-report/
 frontend/test-results/
 .DS_Store
 .env.local
+.vercel/

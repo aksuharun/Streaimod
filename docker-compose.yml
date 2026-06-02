@@ -1,0 +1,44 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      mongo:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/ai-mod
+      NODE_ENV: production
+      PORT: 3000
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      - backend
+    environment:
+      BACKEND_UPSTREAM: backend:3000
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  mongo-data:

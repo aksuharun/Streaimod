@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
-import { getRequiredEnv } from '../config/env.js'
+import { getOptionalEnv, getRequiredEnv } from '../config/env.js'
 
 export const SESSION_COOKIE_NAME = 'ai_mod_session'
 export const OAUTH_STATE_COOKIE_NAME = 'ai_mod_oauth_state'
@@ -35,6 +35,24 @@ function isSecureCookie(): boolean {
   return process.env.NODE_ENV === 'production'
 }
 
+function getSameSitePolicy(): 'Lax' | 'Strict' | 'None' {
+  const configuredPolicy = getOptionalEnv('SESSION_COOKIE_SAME_SITE', 'lax').toLowerCase()
+
+  if (configuredPolicy === 'lax') {
+    return 'Lax'
+  }
+
+  if (configuredPolicy === 'strict') {
+    return 'Strict'
+  }
+
+  if (configuredPolicy === 'none') {
+    return 'None'
+  }
+
+  throw new Error('SESSION_COOKIE_SAME_SITE must be one of: lax, strict, none')
+}
+
 function serializeCookie(
   name: string,
   value: string,
@@ -44,7 +62,7 @@ function serializeCookie(
     `${name}=${value}`,
     'Path=/',
     'HttpOnly',
-    'SameSite=Lax',
+    `SameSite=${getSameSitePolicy()}`,
     `Max-Age=${maxAgeSeconds}`
   ]
 
