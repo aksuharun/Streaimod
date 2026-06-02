@@ -12,3 +12,4 @@ legacy-reference/
 frontend/playwright-report/
 frontend/test-results/
 .DS_Store
+.env.local
