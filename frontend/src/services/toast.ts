@@ -1,44 +1,94 @@
-import { ToastStore } from '@geajs/ui'
+export type ToastTone = 'success' | 'error' | 'info' | 'loading'
 
-type ToastOptions = Parameters<typeof ToastStore.create>[0]
-type TypedToastOptions = Omit<ToastOptions, 'type'>
+export interface ToastOptions {
+  title: string
+  description?: string
+}
+
+export interface ToastItem extends ToastOptions {
+  id: string
+  tone: ToastTone
+}
 
 const MAX_VISIBLE = 2
+const DEFAULT_DURATION_MS = 4000
+const listeners = new Set<() => void>()
+let toasts: ToastItem[] = []
 
-function replaceToast<T>(show: () => T): T {
-  const store = ToastStore.getStore()
-  const visible = store.getVisibleToasts()
+function emit() {
+  for (const listener of listeners) {
+    listener()
+  }
+}
 
-  // When the visible stack is already full, clear it before adding the new
-  // toast. Removing one toast by id lets Zag immediately promote any queued
-  // stale toast, which can make the newest notification wait.
-  if (visible.length >= MAX_VISIBLE) {
-    store.remove()
+function createToastId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function enqueueToast(tone: ToastTone, options: ToastOptions) {
+  const toast: ToastItem = {
+    id: createToastId(),
+    tone,
+    title: options.title,
+    description: options.description
   }
 
-  return show()
+  toasts = [...toasts.slice(-(MAX_VISIBLE - 1)), toast]
+  emit()
+
+  if (tone !== 'loading') {
+    window.setTimeout(() => {
+      dismissToast(toast.id)
+    }, DEFAULT_DURATION_MS)
+  }
+
+  return toast.id
 }
 
-export function showToast(options: ToastOptions) {
-  return replaceToast(() => ToastStore.create(options))
+export function subscribeToasts(listener: () => void) {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
 }
 
-export function showSuccessToast(options: TypedToastOptions) {
-  return replaceToast(() => ToastStore.success(options))
+export function getToasts() {
+  return toasts
 }
 
-export function showErrorToast(options: TypedToastOptions) {
-  return replaceToast(() => ToastStore.error(options))
-}
+export function dismissToast(id: string) {
+  const next = toasts.filter((toast) => toast.id !== id)
+  if (next.length === toasts.length) {
+    return
+  }
 
-export function showInfoToast(options: TypedToastOptions) {
-  return replaceToast(() => ToastStore.info(options))
-}
-
-export function showLoadingToast(options: TypedToastOptions) {
-  return replaceToast(() => ToastStore.loading(options))
+  toasts = next
+  emit()
 }
 
 export function clearToasts() {
-  ToastStore.dismiss()
+  if (toasts.length === 0) {
+    return
+  }
+
+  toasts = []
+  emit()
+}
+
+export function showToast(options: ToastOptions & { tone?: ToastTone }) {
+  return enqueueToast(options.tone ?? 'info', options)
+}
+
+export function showSuccessToast(options: ToastOptions) {
+  return enqueueToast('success', options)
+}
+
+export function showErrorToast(options: ToastOptions) {
+  return enqueueToast('error', options)
+}
+
+export function showInfoToast(options: ToastOptions) {
+  return enqueueToast('info', options)
+}
+
+export function showLoadingToast(options: ToastOptions) {
+  return enqueueToast('loading', options)
 }

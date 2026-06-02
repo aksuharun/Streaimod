@@ -14,15 +14,13 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
-    "jsx": "react-jsx",
-    "jsxImportSource": "@geajs/core"
+    "jsx": "react-jsx"
   },
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.d.ts",
-    "vite.config.ts",
-    "node_modules/@geajs/vite-plugin/gea-env.d.ts"
+    "vite.config.ts"
   ],
   "exclude": [
     "dist",

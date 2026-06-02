@@ -14,8 +14,7 @@
     "test:backend:coverage": "npm --workspace @ai-mod/backend run test:coverage",
     "typecheck:backend": "npm --workspace @ai-mod/backend run typecheck",
     "dev:frontend": "npm --workspace frontend run dev",
-    "build:frontend": "npm --workspace frontend run build",
-    "test:frontend:e2e": "npm --workspace frontend run test:e2e"
+    "build:frontend": "npm --workspace frontend run build"
   },
   "devDependencies": {
     "@varlock/keepass-plugin": "^1.0.0"
