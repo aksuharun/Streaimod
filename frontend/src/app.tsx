@@ -2,13 +2,21 @@ import {
   startTransition,
   useDeferredValue,
   useEffect,
-  useEffectEvent,
   useState,
   useSyncExternalStore,
   type DragEvent,
   type FormEvent,
   type ReactNode
 } from 'react'
+import {
+  ArrowUpRight,
+  LayoutDashboard,
+  LogOut,
+  MessageSquareText,
+  PencilLine,
+  ShieldAlert,
+  Trash2
+} from 'lucide-react'
 
 import { api, ApiError, type AuthChannel, type AuthSession, type ModerationCategory, type ModerationCategoryType, type QnaEntry, type StreamSummary } from './services/api'
 import { buildBackendUrl } from './services/backend-url'
@@ -34,36 +42,36 @@ interface QnaDraft {
 }
 
 const appLinks: Array<{ href: AppRoute; label: string }> = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/qna', label: 'Q&A Rules' },
-  { href: '/moderation', label: 'Moderation Rules' }
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/qna', label: 'Q&A Rules', icon: MessageSquareText },
+  { href: '/moderation', label: 'Moderation Rules', icon: ShieldAlert }
 ]
 
 const featureCards = [
   {
-    title: 'Live stream control center',
-    description: 'See your active and scheduled streams, inspect system health, and start or stop moderation from one command surface.'
+    title: 'Live stream overview',
+    description: 'Track active and scheduled streams, check system health, and start moderation from one place.'
   },
   {
     title: 'Trusted Q&A replies',
-    description: 'Store exact answers for repeated viewer questions so the agent replies only when a configured match exists.'
+    description: 'Store exact answers for repeated viewer questions and reply only on approved matches.'
   },
   {
-    title: 'Policy-based moderation lanes',
-    description: 'Assign canonical safety categories into timeout or ban lanes and keep enforcement decisions understandable.'
+    title: 'Moderation lanes',
+    description: 'Assign safety categories to timeout or ban and keep enforcement rules easy to understand.'
   },
   {
-    title: 'Channel-aware automation',
-    description: 'Every action stays scoped to the connected creator channel, with independent master switches for Q&A and moderation.'
+    title: 'Channel-safe automation',
+    description: 'Everything stays scoped to the connected YouTube channel with separate Q&A and moderation controls.'
   }
 ]
 
 const workflowSteps = [
-  'Message captured with channel context',
-  'Approved rules retrieved for the active channel',
-  'Prompt rendered with trusted entries and policy lanes',
-  'Agent returns a structured decision',
-  'Only safe, explicit actions are executed'
+  'Message received',
+  'Rules loaded',
+  'Prompt rendered',
+  'Decision returned',
+  'Action applied'
 ]
 
 function trimPathname(pathname: string): AppRoute | string {
@@ -252,6 +260,39 @@ function EmptyPanel(props: {
   )
 }
 
+function BrandLogo(props: { variant?: 'icon' | 'full' }) {
+  const variant = props.variant ?? 'icon'
+
+  return (
+    <span className={`brand-mark ${variant === 'full' ? 'brand-mark-full' : ''}`}>
+      <img src="/logo.png" alt="" className={`brand-logo-image ${variant === 'full' ? 'brand-logo-image-full' : ''}`} />
+    </span>
+  )
+}
+
+function GoogleMark() {
+  return (
+    <svg className="google-glyph" viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.72-1.58 2.68-3.92 2.68-6.62Z"
+        fill="#4285F4"
+      />
+      <path
+        d="M9 18c2.43 0 4.46-.8 5.95-2.18l-2.92-2.26c-.8.54-1.83.86-3.03.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z"
+        fill="#34A853"
+      />
+      <path
+        d="M3.97 10.71A5.41 5.41 0 0 1 3.69 9c0-.6.1-1.18.28-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.04l3.01-2.33Z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M9 3.58c1.32 0 2.5.45 3.43 1.34l2.57-2.57A8.94 8.94 0 0 0 9 0 .9 9 0 0 0 .96 4.96l3.01 2.33c.71-2.12 2.7-3.71 5.03-3.71Z"
+        fill="#EA4335"
+      />
+    </svg>
+  )
+}
+
 function AppShell(props: {
   currentPath: string
   channel: AuthChannel | null
@@ -264,10 +305,10 @@ function AppShell(props: {
     <div className="shell">
       <aside className="sidebar">
         <button type="button" className="brand-block" onClick={() => props.onNavigate('/dashboard')}>
-          <span className="brand-mark">M</span>
+          <BrandLogo />
           <span>
             <strong>AI Moderator</strong>
-            <small>Broadcast control</small>
+            <small>YouTube moderation</small>
           </span>
         </button>
 
@@ -298,6 +339,7 @@ function AppShell(props: {
               className={`nav-link ${props.currentPath === link.href ? 'nav-link-active' : ''}`}
               onClick={() => props.onNavigate(link.href)}
             >
+              <link.icon size={16} strokeWidth={2} />
               {link.label}
             </button>
           ))}
@@ -310,9 +352,9 @@ function AppShell(props: {
             disabled={props.busy}
             onClick={() => void props.onLogout()}
           >
+            <LogOut size={16} strokeWidth={2} />
             {props.busy ? 'Signing out...' : 'Sign out'}
           </button>
-          <p>React rebuild · YouTube operations first</p>
         </div>
       </aside>
 
@@ -327,10 +369,10 @@ function LandingScreen(props: { onNavigate: (path: AppRoute) => void }) {
       <section className="landing-hero">
         <header className="landing-nav">
           <div className="brand-inline">
-            <span className="brand-mark">M</span>
+            <BrandLogo />
             <div>
               <strong>AI Moderator</strong>
-              <small>Livestream operations</small>
+              <small>YouTube moderation</small>
             </div>
           </div>
 
@@ -353,11 +395,10 @@ function LandingScreen(props: { onNavigate: (path: AppRoute) => void }) {
 
         <div className="hero-grid">
           <div className="hero-copy">
-            <p className="eyebrow">AI agents for high-velocity live chat</p>
-            <h1>Run livestream chat like a control room, not a comment section.</h1>
+            <p className="eyebrow">YouTube chat operations</p>
+            <h1>Moderate live chat with clear rules.</h1>
             <p className="hero-text">
-              AI Moderator gives creators one sharp surface for stream readiness, trusted Q&A replies,
-              and explicit moderation lanes. No vague autonomy. Only configured actions.
+              A focused workspace for stream status, Google sign-in, trusted Q&A replies, and clear moderation rules.
             </p>
 
             <div className="hero-actions">
@@ -372,12 +413,6 @@ function LandingScreen(props: { onNavigate: (path: AppRoute) => void }) {
                 See workflow
               </button>
             </div>
-
-            <div className="trust-row">
-              <span>Google OAuth</span>
-              <span>YouTube live streams</span>
-              <span>Structured AI decisions</span>
-            </div>
           </div>
 
           <div className="broadcast-card">
@@ -388,7 +423,7 @@ function LandingScreen(props: { onNavigate: (path: AppRoute) => void }) {
             <div className="chat-stack">
               <div className="chat-message muted">
                 <span className="chat-avatar">K</span>
-                <p><strong>Kaan</strong> Will the replay be posted right after the stream?</p>
+                <p><strong>Kaan</strong> Will the replay be posted after the stream?</p>
               </div>
               <div className="chat-message question">
                 <span className="chat-avatar">A</span>
@@ -396,7 +431,7 @@ function LandingScreen(props: { onNavigate: (path: AppRoute) => void }) {
               </div>
               <div className="chat-message answer">
                 <span className="ai-badge">AI</span>
-                <p><strong>AI Moderator</strong> The replay goes live about 20 minutes after the stream ends. We pin the link in chat as soon as it is ready.</p>
+                <p><strong>AI Moderator</strong> The replay goes live about 20 minutes after the stream ends.</p>
               </div>
               <div className="chat-signal">
                 <span>Configured answer matched</span>
@@ -409,8 +444,8 @@ function LandingScreen(props: { onNavigate: (path: AppRoute) => void }) {
 
       <section id="features" className="landing-section">
         <div className="section-heading">
-          <p className="eyebrow">Supported now</p>
-          <h2>Built for creators who need clarity while chat moves fast.</h2>
+          <p className="eyebrow">What it covers</p>
+          <h2>A focused set of tools for live moderation.</h2>
         </div>
         <div className="feature-grid">
           {featureCards.map((card) => (
@@ -425,8 +460,8 @@ function LandingScreen(props: { onNavigate: (path: AppRoute) => void }) {
 
       <section id="workflow" className="landing-section workflow-section">
         <div className="section-heading">
-          <p className="eyebrow">Q&A decision path</p>
-          <h2>Every automated reply passes through an explicit gate.</h2>
+          <p className="eyebrow">Reply flow</p>
+          <h2>Every reply follows a short review path.</h2>
         </div>
         <div className="workflow-rail">
           {workflowSteps.map((step, index) => (
@@ -439,14 +474,15 @@ function LandingScreen(props: { onNavigate: (path: AppRoute) => void }) {
       </section>
 
       <section id="roadmap" className="landing-section roadmap-card">
-        <div>
-          <p className="eyebrow">Coming next</p>
-          <h2>Audience engagement agents that wake up a quiet stream.</h2>
+        <div className="roadmap-copy">
+          <p className="eyebrow">Next</p>
+          <h2>Planned improvements</h2>
+          <p>Careful additions focused on review, engagement, and better moderation workflows.</p>
         </div>
-        <ul>
-          <li>Automated polls based on stream context</li>
-          <li>Retention-aware prompts for slow moments</li>
-          <li>Post-stream insight on moderation load and repeated questions</li>
+        <ul className="roadmap-list">
+          <li>Engagement prompts during slower moments</li>
+          <li>Clearer post-stream review tools</li>
+          <li>Additional moderation workflow refinements</li>
         </ul>
       </section>
     </div>
@@ -463,20 +499,15 @@ function OnboardingScreen(props: {
   return (
     <div className="onboarding-root">
       <div className="onboarding-panel">
-        <div className="brand-inline centered">
-          <span className="brand-mark">M</span>
-          <div>
-            <strong>AI Moderator</strong>
-            <small>Creator setup</small>
-          </div>
+        <div className="onboarding-brand">
+          <BrandLogo variant="full" />
         </div>
 
         <div className="onboarding-copy">
-          <p className="eyebrow">Authentication</p>
-          <h1>Connect Google and load your YouTube channel identity.</h1>
+          <p className="eyebrow">Secure access</p>
+          <h1>Sign in</h1>
           <p>
-            We use Google OAuth to restore your creator channel, remember its moderation settings,
-            and run YouTube chat automation without manual channel ID entry.
+            Use the Google account connected to your channel to continue.
           </p>
         </div>
 
@@ -485,15 +516,18 @@ function OnboardingScreen(props: {
 
         <button
           type="button"
-          className="primary-button giant-button"
+          className="google-button giant-button"
           disabled={props.authenticating}
           onClick={props.onGoogleLogin}
         >
-          {props.authenticating ? 'Redirecting to Google...' : 'Continue with Google'}
+          <span className="google-button-content">
+            <GoogleMark />
+            <span>{props.authenticating ? 'Redirecting to Google...' : 'Continue with Google'}</span>
+          </span>
         </button>
 
         <p className="helper-text">
-          Requires backend Google OAuth configuration and an available MongoDB connection.
+          Your channel and saved moderation settings will be ready after sign-in.
         </p>
       </div>
     </div>
@@ -527,34 +561,82 @@ function DashboardPage(props: {
   else if (scheduledStreams.length > 0) streamState = 'scheduled'
   else streamState = 'empty'
 
-  const checkHealth = useEffectEvent(async () => {
-    setHealth('loading')
+  useEffect(() => {
+    let cancelled = false
 
-    try {
-      const response = await fetch(buildBackendUrl('/health'), {
-        credentials: 'include'
-      })
-      if (!response.ok) {
-        setHealth('error')
-        return
+    async function loadDashboardData() {
+      setHealth('loading')
+      setStreamsLoading(true)
+      setStreamsError(null)
+
+      try {
+        const [healthResponse, overview, runtime] = await Promise.all([
+          fetch(buildBackendUrl('/health'), {
+            credentials: 'include'
+          }),
+          api.getStreamOverview(props.activeChannel.channelId),
+          api.getStreamRuntimeStatus(props.activeChannel.channelId)
+        ])
+
+        if (!cancelled) {
+          if (healthResponse.ok) {
+            const data = (await healthResponse.json()) as { status?: string }
+            setHealth(data.status === 'ok' ? 'ok' : 'error')
+          } else {
+            setHealth('error')
+          }
+
+          setStreams([...overview.active, ...overview.scheduled])
+          setStreamsFetchedAt(overview.fetchedAt)
+          setModeratedStreamId(runtime.streamId)
+          setRuntimeStartedAt(runtime.startedAt)
+          setStreamsLoaded(true)
+          setStreamsError(overview.warning ?? null)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setHealth('error')
+          setStreams([])
+          setStreamsLoaded(true)
+          setStreamsError(error instanceof Error ? error.message : 'Unable to check live streams')
+          setModeratedStreamId(null)
+          setRuntimeStartedAt(null)
+        }
+      } finally {
+        if (!cancelled) {
+          setStreamsLoading(false)
+        }
       }
-
-      const data = (await response.json()) as { status?: string }
-      setHealth(data.status === 'ok' ? 'ok' : 'error')
-    } catch {
-      setHealth('error')
     }
-  })
 
-  const loadStreams = useEffectEvent(async (refresh = false) => {
-    setStreamsLoading(true)
-    setStreamsError(null)
+    void loadDashboardData()
 
+    return () => {
+      cancelled = true
+    }
+  }, [props.activeChannel.channelId])
+
+  async function refreshAll() {
+    setSyncing(true)
     try {
-      const [overview, runtime] = await Promise.all([
-        api.getStreamOverview(props.activeChannel.channelId, { refresh }),
+      setHealth('loading')
+      setStreamsLoading(true)
+      setStreamsError(null)
+
+      const [healthResponse, overview, runtime] = await Promise.all([
+        fetch(buildBackendUrl('/health'), {
+          credentials: 'include'
+        }),
+        api.getStreamOverview(props.activeChannel.channelId, { refresh: true }),
         api.getStreamRuntimeStatus(props.activeChannel.channelId)
       ])
+
+      if (healthResponse.ok) {
+        const data = (await healthResponse.json()) as { status?: string }
+        setHealth(data.status === 'ok' ? 'ok' : 'error')
+      } else {
+        setHealth('error')
+      }
 
       setStreams([...overview.active, ...overview.scheduled])
       setStreamsFetchedAt(overview.fetchedAt)
@@ -563,6 +645,7 @@ function DashboardPage(props: {
       setStreamsLoaded(true)
       setStreamsError(overview.warning ?? null)
     } catch (error) {
+      setHealth('error')
       setStreams([])
       setStreamsLoaded(true)
       setStreamsError(error instanceof Error ? error.message : 'Unable to check live streams')
@@ -570,19 +653,6 @@ function DashboardPage(props: {
       setRuntimeStartedAt(null)
     } finally {
       setStreamsLoading(false)
-    }
-  })
-
-  useEffect(() => {
-    void checkHealth()
-    void loadStreams(false)
-  }, [checkHealth, loadStreams, props.activeChannel.channelId])
-
-  async function refreshAll() {
-    setSyncing(true)
-    try {
-      await Promise.all([checkHealth(), loadStreams(true)])
-    } finally {
       setSyncing(false)
     }
   }
@@ -645,9 +715,9 @@ function DashboardPage(props: {
       <header className="page-header">
         <div>
           <p className="eyebrow">Dashboard</p>
-          <h1>Live stream control</h1>
+          <h1>Streams</h1>
           <p className="page-text">
-            Watch the streams that need attention, confirm system health, and launch moderation from one screen.
+            Check stream status, confirm system health, and start moderation when needed.
           </p>
         </div>
         <div className="header-actions">
@@ -781,17 +851,21 @@ function DashboardPage(props: {
           <button type="button" className="action-row" onClick={() => props.onNavigate('/qna')}>
             <span>
               <strong>Q&A replies</strong>
-              <small>Manage trusted answers for repeated viewer questions.</small>
+              <small>Manage saved answers.</small>
             </span>
-            <em>Open</em>
+            <em>
+              <ArrowUpRight size={16} strokeWidth={2} />
+            </em>
           </button>
 
           <button type="button" className="action-row" onClick={() => props.onNavigate('/moderation')}>
             <span>
               <strong>Moderation rules</strong>
-              <small>Adjust category routing across timeout and ban agents.</small>
+              <small>Adjust timeout and ban routing.</small>
             </span>
-            <em>Open</em>
+            <em>
+              <ArrowUpRight size={16} strokeWidth={2} />
+            </em>
           </button>
         </aside>
       </section>
@@ -820,22 +894,35 @@ function QnaPage(props: {
   const [togglingIds, setTogglingIds] = useState<Record<string, boolean>>({})
   const [deletingIds, setDeletingIds] = useState<Record<string, boolean>>({})
 
-  const loadEntries = useEffectEvent(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const result = await api.getQnaEntries(props.activeChannel.channelId)
-      setEntries(result)
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Failed to load Q&A entries')
-    } finally {
-      setLoading(false)
-    }
-  })
-
   useEffect(() => {
+    let cancelled = false
+
+    async function loadEntries() {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const result = await api.getQnaEntries(props.activeChannel.channelId)
+        if (!cancelled) {
+          setEntries(result)
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : 'Failed to load Q&A entries')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
     void loadEntries()
-  }, [loadEntries, props.activeChannel.channelId])
+
+    return () => {
+      cancelled = true
+    }
+  }, [props.activeChannel.channelId])
 
   const filteredEntries = deferredSearch
     ? entries.filter((entry) => {
@@ -983,7 +1070,7 @@ function QnaPage(props: {
           <p className="eyebrow">Automated replies</p>
           <h1>Q&A Rules</h1>
           <p className="page-text">
-            Store exact replies for repeated viewer questions. The agent stays silent unless a configured trusted match exists.
+            Store exact replies for repeated questions. The agent only answers on saved matches.
           </p>
         </div>
         <button type="button" className="primary-button" onClick={openCreateModal}>
@@ -1013,7 +1100,22 @@ function QnaPage(props: {
       {error && (
         <div className="error-banner inline-banner">
           <span>{error}</span>
-          <button type="button" className="ghost-button" onClick={() => void loadEntries()}>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={async () => {
+              setLoading(true)
+              setError(null)
+              try {
+                const result = await api.getQnaEntries(props.activeChannel.channelId)
+                setEntries(result)
+              } catch (loadError) {
+                setError(loadError instanceof Error ? loadError.message : 'Failed to load Q&A entries')
+              } finally {
+                setLoading(false)
+              }
+            }}
+          >
             Retry
           </button>
         </div>
@@ -1081,6 +1183,7 @@ function QnaPage(props: {
                       <td>
                         <div className="table-actions">
                           <button type="button" className="ghost-button" onClick={() => openEditModal(entry)}>
+                            <PencilLine size={16} strokeWidth={2} />
                             Edit
                           </button>
                           <button
@@ -1089,6 +1192,7 @@ function QnaPage(props: {
                             disabled={!!deletingIds[entry.id]}
                             onClick={() => void deleteRule(entry)}
                           >
+                            <Trash2 size={16} strokeWidth={2} />
                             {deletingIds[entry.id] ? 'Deleting...' : 'Delete'}
                           </button>
                         </div>
@@ -1173,26 +1277,40 @@ function ModerationPage(props: {
   const [movingIds, setMovingIds] = useState<Record<string, boolean>>({})
   const [togglingIds, setTogglingIds] = useState<Record<string, boolean>>({})
 
-  const loadBoard = useEffectEvent(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [catalogEntries, assignedCategories] = await Promise.all([
-        api.getCatalogEntries(),
-        api.getCategories({ channelId: props.activeChannel.channelId })
-      ])
-      setCatalog(catalogEntries)
-      setCategories(assignedCategories)
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Failed to load moderation categories')
-    } finally {
-      setLoading(false)
-    }
-  })
-
   useEffect(() => {
+    let cancelled = false
+
+    async function loadBoard() {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const [catalogEntries, assignedCategories] = await Promise.all([
+          api.getCatalogEntries(),
+          api.getCategories({ channelId: props.activeChannel.channelId })
+        ])
+
+        if (!cancelled) {
+          setCatalog(catalogEntries)
+          setCategories(assignedCategories)
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : 'Failed to load moderation categories')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
     void loadBoard()
-  }, [loadBoard, props.activeChannel.channelId])
+
+    return () => {
+      cancelled = true
+    }
+  }, [props.activeChannel.channelId])
 
   const boardItems = catalog.map((entry) => {
     const assigned = categories.find((category) => category.catalogId === entry.catalogId)
@@ -1426,7 +1544,7 @@ function ModerationPage(props: {
           <p className="eyebrow">Chat safety</p>
           <h1>Moderation Rules</h1>
           <p className="page-text">
-            Route every canonical safety category into timeout or ban. The board is the policy surface.
+            Route each safety category to timeout or ban.
           </p>
         </div>
       </header>
@@ -1460,7 +1578,24 @@ function ModerationPage(props: {
           title="Failed to load categories"
           description={error}
           actionLabel="Retry"
-          onAction={() => void loadBoard()}
+          onAction={() => {
+            void (async () => {
+              setLoading(true)
+              setError(null)
+              try {
+                const [catalogEntries, assignedCategories] = await Promise.all([
+                  api.getCatalogEntries(),
+                  api.getCategories({ channelId: props.activeChannel.channelId })
+                ])
+                setCatalog(catalogEntries)
+                setCategories(assignedCategories)
+              } catch (loadError) {
+                setError(loadError instanceof Error ? loadError.message : 'Failed to load moderation categories')
+              } finally {
+                setLoading(false)
+              }
+            })()
+          }}
         />
       ) : (
         <section className="board-grid">
@@ -1494,36 +1629,48 @@ export default function App() {
   const [loggingOut, setLoggingOut] = useState(false)
   const [channelSettingsUpdating, setChannelSettingsUpdating] = useState<Record<string, boolean>>({})
 
-  const syncLocation = useEffectEvent(() => {
-    setPath(trimPathname(window.location.pathname))
-  })
-
   useEffect(() => {
+    function syncLocation() {
+      setPath(trimPathname(window.location.pathname))
+    }
+
     window.addEventListener('popstate', syncLocation)
     return () => window.removeEventListener('popstate', syncLocation)
-  }, [syncLocation])
-
-  const bootstrap = useEffectEvent(async () => {
-    try {
-      const nextSession = await api.getAuthSession()
-      setSession(nextSession)
-    } catch (error) {
-      if (!(error instanceof ApiError && error.status === 401)) {
-        showErrorToast({
-          title: 'Session restore failed',
-          description: error instanceof Error ? error.message : 'Unable to restore the current session.'
-        })
-      }
-      setSession(null)
-    } finally {
-      setBooting(false)
-      setAuthenticating(false)
-    }
-  })
+  }, [])
 
   useEffect(() => {
+    let cancelled = false
+
+    async function bootstrap() {
+      try {
+        const nextSession = await api.getAuthSession()
+        if (!cancelled) {
+          setSession(nextSession)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          if (!(error instanceof ApiError && error.status === 401)) {
+            showErrorToast({
+              title: 'Session restore failed',
+              description: error instanceof Error ? error.message : 'Unable to restore the current session.'
+            })
+          }
+          setSession(null)
+        }
+      } finally {
+        if (!cancelled) {
+          setBooting(false)
+          setAuthenticating(false)
+        }
+      }
+    }
+
     void bootstrap()
-  }, [bootstrap])
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function navigate(nextPath: AppRoute, options: { replace?: boolean } = {}) {
     if (trimPathname(window.location.pathname) === nextPath) {
@@ -1631,7 +1778,7 @@ export default function App() {
     content = (
       <div className="boot-screen">
         <div className="boot-panel">
-          <span className="brand-mark">M</span>
+          <BrandLogo />
           <strong>Loading creator control surface...</strong>
         </div>
       </div>
