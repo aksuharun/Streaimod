@@ -15,10 +15,21 @@ import {
   MessageSquareText,
   PencilLine,
   ShieldAlert,
+  Terminal,
   Trash2
 } from 'lucide-react'
 
-import { api, ApiError, type AuthChannel, type AuthSession, type ModerationCategory, type ModerationCategoryType, type QnaEntry, type StreamSummary } from './services/api'
+import {
+  api,
+  ApiError,
+  type AuthChannel,
+  type AuthSession,
+  type ChatCommand,
+  type ModerationCategory,
+  type ModerationCategoryType,
+  type QnaEntry,
+  type StreamSummary
+} from './services/api'
 import { buildBackendUrl } from './services/backend-url'
 import {
   clearToasts,
@@ -30,7 +41,7 @@ import {
   type ToastItem
 } from './services/toast'
 
-type AppRoute = '/' | '/onboarding' | '/dashboard' | '/qna' | '/moderation'
+type AppRoute = '/' | '/onboarding' | '/dashboard' | '/qna' | '/commands' | '/moderation'
 type HealthStatus = 'ok' | 'error' | 'loading' | 'unknown'
 type StreamStatusLabel = 'loading' | 'live' | 'scheduled' | 'empty' | 'error' | 'unknown'
 type BoardColumn = 'catalog' | ModerationCategoryType
@@ -41,9 +52,16 @@ interface QnaDraft {
   enabled: boolean
 }
 
-const appLinks: Array<{ href: AppRoute; label: string }> = [
+interface CommandDraft {
+  trigger: string
+  replyText: string
+  enabled: boolean
+}
+
+const appLinks: Array<{ href: AppRoute; label: string; icon: typeof LayoutDashboard }> = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/qna', label: 'Q&A Rules', icon: MessageSquareText },
+  { href: '/commands', label: 'Commands', icon: Terminal },
   { href: '/moderation', label: 'Moderation Rules', icon: ShieldAlert }
 ]
 
@@ -72,6 +90,27 @@ const workflowSteps = [
   'Prompt rendered',
   'Decision returned',
   'Action applied'
+]
+
+const roadmapItems = [
+  {
+    phase: 'Soon',
+    title: 'Engagement prompts',
+    description: 'Surface lightweight prompts during slower moments so the host can restart conversation without losing stream context.',
+    tag: 'Audience flow'
+  },
+  {
+    phase: 'In review',
+    title: 'Post-stream review workspace',
+    description: 'Group notable replies, moderation actions, and missed questions into one cleaner pass after the broadcast ends.',
+    tag: 'Review tools'
+  },
+  {
+    phase: 'Queued',
+    title: 'Moderation workflow refinements',
+    description: 'Tighten the path from category edits to runtime decisions so operators can adjust enforcement with less friction.',
+    tag: 'Operator UX'
+  }
 ]
 
 function trimPathname(pathname: string): AppRoute | string {
@@ -149,7 +188,12 @@ function toneClass(tone: ToastItem['tone']) {
 }
 
 function isProtectedRoute(path: string) {
-  return path === '/dashboard' || path === '/qna' || path === '/moderation'
+  return (
+    path === '/dashboard' ||
+    path === '/qna' ||
+    path === '/commands' ||
+    path === '/moderation'
+  )
 }
 
 function ToastViewport() {
@@ -265,7 +309,15 @@ function BrandLogo(props: { variant?: 'icon' | 'full' }) {
 
   return (
     <span className={`brand-mark ${variant === 'full' ? 'brand-mark-full' : ''}`}>
-      <img src="/logo.png" alt="" className={`brand-logo-image ${variant === 'full' ? 'brand-logo-image-full' : ''}`} />
+      <span className="brand-glyph-shell">
+        <img src="/logo.png" alt="" className="brand-logo-image" />
+      </span>
+      {variant === 'full' ? (
+        <span className="brand-wordmark">
+          <strong>Streaimod</strong>
+          <small>Channel moderation control</small>
+        </span>
+      ) : null}
     </span>
   )
 }
@@ -473,17 +525,45 @@ function LandingScreen(props: { onNavigate: (path: AppRoute) => void }) {
         </div>
       </section>
 
-      <section id="roadmap" className="landing-section roadmap-card">
-        <div className="roadmap-copy">
-          <p className="eyebrow">Next</p>
-          <h2>Planned improvements</h2>
-          <p>Careful additions focused on review, engagement, and better moderation workflows.</p>
+      <section id="roadmap" className="landing-section roadmap-section">
+        <div className="roadmap-card">
+          <div className="roadmap-copy">
+            <div className="roadmap-heading-row">
+              <p className="eyebrow">Next</p>
+              <span className="roadmap-badge">Planned rollout</span>
+            </div>
+            <h2>Planned improvements</h2>
+            <p>Careful additions focused on review, engagement, and better moderation workflows.</p>
+
+            <div className="roadmap-summary">
+              <div>
+                <strong>03</strong>
+                <span>tracks in motion</span>
+              </div>
+              <div>
+                <strong>1</strong>
+                <span>channel workflow</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="roadmap-grid">
+            {roadmapItems.map((item, index) => (
+              <article key={item.title} className="roadmap-item">
+                <div className="roadmap-item-top">
+                  <span className="roadmap-step">{String(index + 1).padStart(2, '0')}</span>
+                  <span className="roadmap-tag">{item.tag}</span>
+                </div>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
+                <div className="roadmap-item-footer">
+                  <span>{item.phase}</span>
+                  <ArrowUpRight size={16} strokeWidth={2} />
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
-        <ul className="roadmap-list">
-          <li>Engagement prompts during slower moments</li>
-          <li>Clearer post-stream review tools</li>
-          <li>Additional moderation workflow refinements</li>
-        </ul>
       </section>
     </div>
   )
@@ -876,7 +956,11 @@ function DashboardPage(props: {
 function QnaPage(props: {
   activeChannel: AuthChannel
   channelSettingsUpdating: boolean
-  onUpdateChannelSettings: (data: { qnaEnabled?: boolean; moderationEnabled?: boolean }) => Promise<void>
+  onUpdateChannelSettings: (data: {
+    qnaEnabled?: boolean
+    commandsEnabled?: boolean
+    moderationEnabled?: boolean
+  }) => Promise<void>
 }) {
   const [entries, setEntries] = useState<QnaEntry[]>([])
   const [loading, setLoading] = useState(false)
@@ -1263,10 +1347,431 @@ function QnaPage(props: {
   )
 }
 
+function CommandsPage(props: {
+  activeChannel: AuthChannel
+  channelSettingsUpdating: boolean
+  onUpdateChannelSettings: (data: {
+    qnaEnabled?: boolean
+    commandsEnabled?: boolean
+    moderationEnabled?: boolean
+  }) => Promise<void>
+}) {
+  const [commands, setCommands] = useState<ChatCommand[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const deferredSearch = useDeferredValue(search.trim())
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingCommand, setEditingCommand] = useState<ChatCommand | null>(null)
+  const [draft, setDraft] = useState<CommandDraft>({
+    trigger: '',
+    replyText: '',
+    enabled: true
+  })
+  const [saving, setSaving] = useState(false)
+  const [togglingIds, setTogglingIds] = useState<Record<string, boolean>>({})
+  const [deletingIds, setDeletingIds] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadCommands() {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const result = await api.getChatCommands(props.activeChannel.channelId)
+        if (!cancelled) {
+          setCommands(result)
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : 'Failed to load commands')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void loadCommands()
+
+    return () => {
+      cancelled = true
+    }
+  }, [props.activeChannel.channelId])
+
+  const filteredCommands = deferredSearch
+    ? commands.filter((command) => {
+        const needle = deferredSearch.toLowerCase()
+        return (
+          command.trigger.toLowerCase().includes(needle) ||
+          command.replyText.toLowerCase().includes(needle)
+        )
+      })
+    : commands
+
+  function openCreateModal() {
+    setEditingCommand(null)
+    setDraft({ trigger: '', replyText: '', enabled: true })
+    setModalOpen(true)
+  }
+
+  function openEditModal(command: ChatCommand) {
+    setEditingCommand(command)
+    setDraft({
+      trigger: command.trigger,
+      replyText: command.replyText,
+      enabled: command.enabled
+    })
+    setModalOpen(true)
+  }
+
+  async function submitCommand(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const trigger = draft.trigger.trim()
+    const replyText = draft.replyText.trim()
+
+    if (!trigger || !replyText) {
+      showErrorToast({
+        title: 'Validation error',
+        description: 'Trigger and reply text are both required.'
+      })
+      return
+    }
+
+    if (!trigger.startsWith('!')) {
+      showErrorToast({
+        title: 'Validation error',
+        description: 'Trigger must start with !.'
+      })
+      return
+    }
+
+    setSaving(true)
+    try {
+      if (editingCommand) {
+        const updated = await api.updateChatCommand(editingCommand.id, {
+          trigger,
+          replyText,
+          enabled: draft.enabled
+        })
+        setCommands((current) => current.map((command) => command.id === updated.id ? updated : command))
+        showSuccessToast({
+          title: 'Command updated',
+          description: `The ${updated.trigger} auto-reply is ready to use.`
+        })
+      } else {
+        const created = await api.createChatCommand({
+          channelId: props.activeChannel.channelId,
+          trigger,
+          replyText,
+          enabled: draft.enabled
+        })
+        setCommands((current) => [created, ...current])
+        showSuccessToast({
+          title: 'Command created',
+          description: `${created.trigger} can now send its saved reply in chat.`
+        })
+      }
+
+      setModalOpen(false)
+      setEditingCommand(null)
+    } catch (saveError) {
+      showErrorToast({
+        title: 'Save failed',
+        description: saveError instanceof Error ? saveError.message : 'Failed to save command.'
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function toggleCommand(command: ChatCommand) {
+    setTogglingIds((current) => ({ ...current, [command.id]: true }))
+    try {
+      const updated = await api.updateChatCommand(command.id, {
+        enabled: !command.enabled
+      })
+      setCommands((current) => current.map((item) => item.id === updated.id ? updated : item))
+      showSuccessToast({
+        title: updated.enabled ? 'Command enabled' : 'Command paused',
+        description: `${updated.trigger} is now ${updated.enabled ? 'active' : 'paused'}.`
+      })
+    } catch (toggleError) {
+      showErrorToast({
+        title: 'Toggle failed',
+        description: toggleError instanceof Error ? toggleError.message : 'Failed to update command status.'
+      })
+    } finally {
+      setTogglingIds((current) => ({ ...current, [command.id]: false }))
+    }
+  }
+
+  async function deleteCommand(command: ChatCommand) {
+    if (!window.confirm(`Delete command "${command.trigger}"?`)) {
+      return
+    }
+
+    setDeletingIds((current) => ({ ...current, [command.id]: true }))
+    try {
+      await api.deleteChatCommand(command.id)
+      setCommands((current) => current.filter((item) => item.id !== command.id))
+      showSuccessToast({
+        title: 'Command deleted',
+        description: 'The saved auto-reply command has been removed.'
+      })
+    } catch (deleteError) {
+      showErrorToast({
+        title: 'Delete failed',
+        description: deleteError instanceof Error ? deleteError.message : 'Failed to delete command.'
+      })
+    } finally {
+      setDeletingIds((current) => ({ ...current, [command.id]: false }))
+    }
+  }
+
+  async function retryLoad() {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await api.getChatCommands(props.activeChannel.channelId)
+      setCommands(result)
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load commands')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function toggleAgent() {
+    try {
+      await props.onUpdateChannelSettings({
+        commandsEnabled: !props.activeChannel.commandsEnabled
+      })
+      showSuccessToast({
+        title: !props.activeChannel.commandsEnabled ? 'Commands enabled' : 'Commands paused',
+        description: !props.activeChannel.commandsEnabled
+          ? 'Saved commands can reply to matching live chat triggers again.'
+          : 'Saved commands stay stored, but command-based auto replies are paused.'
+      })
+    } catch (toggleError) {
+      showErrorToast({
+        title: 'Agent update failed',
+        description: toggleError instanceof Error ? toggleError.message : 'Failed to update the commands setting.'
+      })
+    }
+  }
+
+  return (
+    <div className="page-wrap">
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">Instant shortcuts</p>
+          <h1>Commands</h1>
+          <p className="page-text">
+            Save exact triggers like <code>!linktree</code> and send a fixed reply whenever viewers use them.
+          </p>
+        </div>
+        <button type="button" className="primary-button" onClick={openCreateModal}>
+          Add command
+        </button>
+      </header>
+
+      <section className="panel agent-banner">
+        <div>
+          <p className="eyebrow">Channel switch</p>
+          <h2>Commands status</h2>
+          <p>
+            {props.activeChannel.commandsEnabled
+              ? 'Command-based replies are enabled and can answer exact triggers like !linktree.'
+              : 'Command-based replies are paused. Saved commands stay available, but live auto replies are disabled.'}
+          </p>
+        </div>
+        <StatusSwitch
+          checked={props.activeChannel.commandsEnabled}
+          disabled={props.channelSettingsUpdating}
+          activeLabel={props.channelSettingsUpdating ? 'Saving...' : 'Enabled'}
+          inactiveLabel={props.channelSettingsUpdating ? 'Saving...' : 'Paused'}
+          onToggle={() => void toggleAgent()}
+        />
+      </section>
+
+      <section className="panel">
+        <p className="eyebrow">How it works</p>
+        <h2>Exact chat triggers with saved replies</h2>
+        <p>
+          Commands are matched per channel and can be enabled or paused individually. Use them for links,
+          schedules, socials, or quick viewer help.
+        </p>
+      </section>
+
+      {error && (
+        <div className="error-banner inline-banner">
+          <span>{error}</span>
+          <button type="button" className="ghost-button" onClick={() => void retryLoad()}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {loading && commands.length === 0 ? (
+        <EmptyPanel
+          title="Loading command replies"
+          description="Pulling the saved chat commands for this channel."
+        />
+      ) : commands.length === 0 ? (
+        <EmptyPanel
+          title="No commands configured yet"
+          description="Create a trigger like !linktree and map it to a saved reply for viewers."
+          actionLabel="Add first command"
+          onAction={openCreateModal}
+        />
+      ) : (
+        <section className="panel">
+          <div className="table-toolbar">
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Filter by trigger or reply text..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <span className="toolbar-count">
+              Showing <strong>{filteredCommands.length}</strong> of {commands.length}
+            </span>
+          </div>
+
+          {filteredCommands.length === 0 ? (
+            <EmptyPanel
+              title="No commands match this filter"
+              description="Try a different keyword or clear the search query."
+            />
+          ) : (
+            <div className="table-card">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Trigger</th>
+                    <th>Reply text</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCommands.map((command) => (
+                    <tr key={command.id}>
+                      <td>
+                        <strong>{command.trigger}</strong>
+                      </td>
+                      <td>{command.replyText}</td>
+                      <td>
+                        <StatusSwitch
+                          checked={command.enabled}
+                          disabled={!!togglingIds[command.id]}
+                          activeLabel={togglingIds[command.id] ? 'Saving...' : 'Active'}
+                          inactiveLabel={togglingIds[command.id] ? 'Saving...' : 'Paused'}
+                          onToggle={() => void toggleCommand(command)}
+                        />
+                      </td>
+                      <td>
+                        <div className="table-actions">
+                          <button type="button" className="ghost-button" onClick={() => openEditModal(command)}>
+                            <PencilLine size={16} strokeWidth={2} />
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="danger-link"
+                            disabled={!!deletingIds[command.id]}
+                            onClick={() => void deleteCommand(command)}
+                          >
+                            <Trash2 size={16} strokeWidth={2} />
+                            {deletingIds[command.id] ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {modalOpen && (
+        <Modal
+          title={editingCommand ? 'Modify command reply' : 'Add command reply'}
+          description={
+            editingCommand
+              ? 'Update the trigger or saved response.'
+              : 'Create a reusable chat shortcut with a fixed reply.'
+          }
+          onClose={() => {
+            if (!saving) setModalOpen(false)
+          }}
+        >
+          <form className="editor-form" onSubmit={(event) => void submitCommand(event)}>
+            <label>
+              <span>Trigger</span>
+              <input
+                type="text"
+                className="search-input"
+                value={draft.trigger}
+                onChange={(event) => setDraft((current) => ({ ...current, trigger: event.target.value }))}
+                placeholder="e.g. !linktree"
+              />
+            </label>
+
+            <label>
+              <span>Reply text</span>
+              <textarea
+                rows={5}
+                value={draft.replyText}
+                onChange={(event) => setDraft((current) => ({ ...current, replyText: event.target.value }))}
+                placeholder="e.g. You can reach me at https://linktr.ee/mylink"
+              />
+            </label>
+
+            <div className="editor-toggle">
+              <div>
+                <strong>Enable command</strong>
+                <p>If disabled, the trigger stays stored but will not send its reply in chat.</p>
+              </div>
+              <StatusSwitch
+                checked={draft.enabled}
+                activeLabel="Active"
+                inactiveLabel="Paused"
+                onToggle={() => setDraft((current) => ({ ...current, enabled: !current.enabled }))}
+              />
+            </div>
+
+            <div className="editor-actions">
+              <button type="button" className="ghost-button" disabled={saving} onClick={() => setModalOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="primary-button" disabled={saving}>
+                {saving ? 'Saving...' : editingCommand ? 'Save changes' : 'Create command'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
 function ModerationPage(props: {
   activeChannel: AuthChannel
   channelSettingsUpdating: boolean
-  onUpdateChannelSettings: (data: { qnaEnabled?: boolean; moderationEnabled?: boolean }) => Promise<void>
+  onUpdateChannelSettings: (data: {
+    qnaEnabled?: boolean
+    commandsEnabled?: boolean
+    moderationEnabled?: boolean
+  }) => Promise<void>
 }) {
   const [catalog, setCatalog] = useState<Array<{ catalogId: string; label: string; definition: string }>>([])
   const [categories, setCategories] = useState<ModerationCategory[]>([])
@@ -1742,6 +2247,7 @@ export default function App() {
 
   async function updateChannelSettings(data: {
     qnaEnabled?: boolean
+    commandsEnabled?: boolean
     moderationEnabled?: boolean
   }) {
     if (!session || !activeChannel) {
@@ -1800,6 +2306,14 @@ export default function App() {
     } else if (path === '/qna') {
       page = (
         <QnaPage
+          activeChannel={activeChannel}
+          channelSettingsUpdating={!!channelSettingsUpdating[activeChannel.channelId]}
+          onUpdateChannelSettings={updateChannelSettings}
+        />
+      )
+    } else if (path === '/commands') {
+      page = (
+        <CommandsPage
           activeChannel={activeChannel}
           channelSettingsUpdating={!!channelSettingsUpdating[activeChannel.channelId]}
           onUpdateChannelSettings={updateChannelSettings}

@@ -138,6 +138,7 @@ describe('authenticateGoogleUser', () => {
       expect(toAuthSessionDto(user).user.channels[0]?.thumbnail).toBe(
         'https://img.youtube.test/channel-1.jpg'
       )
+      expect(toAuthSessionDto(user).user.channels[0]?.commandsEnabled).toBe(true)
     })
   })
 
@@ -226,7 +227,8 @@ describe('authenticateGoogleUser', () => {
             channelId: 'channel-3',
             name: 'Legacy Channel',
             handle: '@legacy-channel',
-            thumbnail: null
+            thumbnail: null,
+            commandsEnabled: false
           }
         ],
         lastLoginAt: new Date('2026-05-31T09:00:00.000Z')
@@ -246,6 +248,7 @@ describe('authenticateGoogleUser', () => {
       expect(storedUser?.channels[0]?.thumbnail).toBe(
         'https://img.youtube.test/refreshed-channel.jpg'
       )
+      expect(storedUser?.channels[0]?.commandsEnabled).toBe(false)
     })
   })
 })

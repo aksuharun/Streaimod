@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
 
 :root {
   --bg: #f6f5f2;
@@ -20,6 +20,8 @@
   --error-text: #a54842;
   --info-bg: #f0f4ff;
   --info-text: #375a96;
+  --font-body: "Manrope", "Segoe UI", sans-serif;
+  --font-display: "Manrope", "Segoe UI", sans-serif;
 }
 
 * {
@@ -37,7 +39,8 @@ body {
   min-width: 320px;
   background: var(--bg);
   color: var(--text);
-  font-family: "Public Sans", "Segoe UI", sans-serif;
+  font-family: var(--font-body);
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -107,8 +110,8 @@ a {
 }
 
 .onboarding-panel {
-  width: min(100%, 520px);
-  padding: 44px 40px 36px;
+  width: min(100%, 540px);
+  padding: 58px 52px 46px;
   border-radius: 28px;
   text-align: left;
 }
@@ -120,23 +123,29 @@ a {
 .roadmap-card h2,
 .modal-header h2 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: clamp(2rem, 4vw, 3.25rem);
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  line-height: 0.94;
+  text-wrap: balance;
 }
 
 .onboarding-copy {
-  margin: 30px 0 24px;
+  display: grid;
+  gap: 14px;
+  margin: 34px 0 26px;
 }
 
 .onboarding-copy h1 {
-  font-size: clamp(2.2rem, 4vw, 3rem);
-  max-width: 10ch;
+  font-size: clamp(2.4rem, 4.8vw, 3.5rem);
+  max-width: 8ch;
 }
 
 .onboarding-copy p:last-child {
-  max-width: 32ch;
+  max-width: 30ch;
+  font-size: 1.02rem;
+  text-wrap: pretty;
 }
 
 .onboarding-copy p:last-child,
@@ -159,7 +168,8 @@ a {
 
 .helper-text {
   margin: 16px 0 0;
-  font-size: 0.92rem;
+  font-size: 0.94rem;
+  line-height: 1.7;
   max-width: 34ch;
 }
 
@@ -201,15 +211,18 @@ a {
 .brand-inline strong,
 .brand-block strong {
   display: block;
-  font-size: 0.98rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 
 .brand-inline small,
 .brand-block small {
   display: block;
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   margin-top: 2px;
 }
 
@@ -232,35 +245,74 @@ a {
 }
 
 .brand-mark {
-  width: 40px;
-  height: 40px;
+  width: 46px;
+  height: 46px;
   border-radius: 12px;
-  border: 1px solid var(--line-strong);
-  background: var(--surface);
-  overflow: hidden;
+  overflow: visible;
   flex: none;
+}
+
+.brand-glyph-shell {
+  width: 100%;
+  height: 100%;
+  display: inline-grid;
+  place-items: center;
+  padding: 1px;
+  border-radius: inherit;
+  overflow: visible;
+  background: transparent;
+  border: 1px solid rgba(22, 22, 22, 0.08);
+  box-shadow: 0 10px 22px rgba(17, 17, 17, 0.08);
 }
 
 .brand-logo-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  transform: scale(1.7);
-  transform-origin: center;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.95))
+    drop-shadow(0 8px 18px rgba(17, 17, 17, 0.14))
+    contrast(1.08);
+}
+
+.brand-mark-full .brand-glyph-shell {
+  width: 66px;
+  height: 66px;
+  padding: 2px;
+  border-radius: 18px;
 }
 
 .brand-mark-full {
-  width: 196px;
-  height: 74px;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
   border: 0;
-  border-radius: 0;
   background: transparent;
   box-shadow: none;
 }
 
-.brand-logo-image-full {
-  object-fit: contain;
-  transform: none;
+.brand-wordmark {
+  display: grid;
+  gap: 4px;
+}
+
+.brand-wordmark strong {
+  display: block;
+  font-size: clamp(1.35rem, 2.8vw, 1.78rem);
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  line-height: 0.94;
+}
+
+.brand-wordmark small {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 .landing-nav-links {
@@ -315,9 +367,9 @@ a {
 .eyebrow {
   margin: 0 0 10px;
   color: var(--text-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
@@ -577,7 +629,6 @@ a {
 
 .feature-card h3,
 .workflow-step p,
-.roadmap-card li,
 .panel h2,
 .policy-card h3,
 .modal-header h2 {
@@ -591,35 +642,120 @@ a {
   letter-spacing: 0.12em;
 }
 
-.roadmap-card {
+.roadmap-section {
   margin-top: 36px;
+}
+
+.roadmap-card {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   gap: 28px;
   align-items: start;
+  padding: 30px;
+}
+
+.roadmap-heading-row,
+.roadmap-item-top,
+.roadmap-item-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .roadmap-copy p:last-child {
   margin: 14px 0 0;
 }
 
-.roadmap-list,
-.roadmap-card ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.roadmap-badge,
+.roadmap-tag,
+.roadmap-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.roadmap-badge {
+  background: rgba(240, 244, 255, 0.95);
+  border: 1px solid rgba(55, 90, 150, 0.12);
+  color: var(--info-text);
+}
+
+.roadmap-summary {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  margin-top: 28px;
 }
 
-.roadmap-list li {
-  padding: 14px 0;
-  border-bottom: 1px solid var(--line);
+.roadmap-summary div,
+.roadmap-item {
+  border-radius: 18px;
+  border: 1px solid rgba(214, 208, 198, 0.85);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px);
 }
 
-.roadmap-list li:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
+.roadmap-summary div {
+  padding: 16px 18px;
+}
+
+.roadmap-summary strong {
+  display: block;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.roadmap-summary span {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.roadmap-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.roadmap-item {
+  padding: 20px;
+  box-shadow: 0 12px 30px rgba(17, 17, 17, 0.04);
+}
+
+.roadmap-step {
+  background: var(--text);
+  color: var(--surface);
+}
+
+.roadmap-tag {
+  background: var(--surface-soft);
+  color: var(--text-muted);
+}
+
+.roadmap-item h3 {
+  margin: 18px 0 0;
+  font-size: 1.15rem;
+}
+
+.roadmap-item p {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+.roadmap-item-footer {
+  margin-top: 20px;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .success-banner,
@@ -1221,6 +1357,10 @@ tbody td {
     grid-template-columns: 1fr;
   }
 
+  .roadmap-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .shell {
     grid-template-columns: 1fr;
   }
@@ -1256,17 +1396,41 @@ tbody td {
     justify-content: space-between;
   }
 
+  .roadmap-card,
+  .roadmap-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .roadmap-heading-row,
+  .roadmap-item-top,
+  .roadmap-item-footer {
+    align-items: flex-start;
+  }
+
   .header-actions {
     justify-content: flex-start;
   }
 
   .onboarding-panel {
-    padding: 32px 24px 26px;
+    padding: 40px 30px 32px;
   }
 
   .brand-mark-full {
-    width: 164px;
-    height: 62px;
+    gap: 12px;
+  }
+
+  .brand-mark-full .brand-glyph-shell {
+    width: 58px;
+    height: 58px;
+  }
+
+  .brand-wordmark strong {
+    font-size: 1.2rem;
+  }
+
+  .brand-wordmark small {
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
   }
 
   .table-card table,

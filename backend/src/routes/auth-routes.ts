@@ -154,6 +154,7 @@ router.patch('/channels/:channelId/settings', requireAuthenticatedUser, async (r
 
     const updates: {
       qnaEnabled?: boolean
+      commandsEnabled?: boolean
       moderationEnabled?: boolean
     } = {}
 
@@ -175,6 +176,15 @@ router.patch('/channels/:channelId/settings', requireAuthenticatedUser, async (r
       updates.moderationEnabled = body.moderationEnabled
     }
 
+    if (body.commandsEnabled !== undefined) {
+      if (typeof body.commandsEnabled !== 'boolean') {
+        response.status(400).json({ error: 'commandsEnabled must be a boolean' })
+        return
+      }
+
+      updates.commandsEnabled = body.commandsEnabled
+    }
+
     if (Object.keys(updates).length === 0) {
       response.status(400).json({ error: 'At least one channel setting must be provided' })
       return
@@ -190,6 +200,10 @@ router.patch('/channels/:channelId/settings', requireAuthenticatedUser, async (r
 
     if (updates.qnaEnabled !== undefined) {
       channel.qnaEnabled = updates.qnaEnabled
+    }
+
+    if (updates.commandsEnabled !== undefined) {
+      channel.commandsEnabled = updates.commandsEnabled
     }
 
     if (updates.moderationEnabled !== undefined) {

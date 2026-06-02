@@ -44,6 +44,7 @@ export interface AuthSessionDto {
       handle: string | null
       thumbnail: string | null
       qnaEnabled: boolean
+      commandsEnabled: boolean
       moderationEnabled: boolean
     }>
     activeChannelId: string
@@ -111,6 +112,7 @@ function mapIdentityToOwnedChannel(
     handle: identity.handle || null,
     thumbnail: identity.profilePictureUrl ?? null,
     qnaEnabled: true,
+    commandsEnabled: true,
     moderationEnabled: true
   }
 }
@@ -122,6 +124,7 @@ function cloneOwnedChannel(channel: IYoutubeOwnedChannel): IYoutubeOwnedChannel 
     handle: channel.handle ?? null,
     thumbnail: channel.thumbnail ?? null,
     qnaEnabled: channel.qnaEnabled ?? true,
+    commandsEnabled: channel.commandsEnabled ?? true,
     moderationEnabled: channel.moderationEnabled ?? true
   }
 }
@@ -142,6 +145,17 @@ export function isChannelQnaEnabled(
   }
 
   return getOwnedChannel(user, channelId)?.qnaEnabled ?? true
+}
+
+export function isChannelCommandsEnabled(
+  user: IUserDocument,
+  channelId: string
+): boolean {
+  if (channelId === '*') {
+    return true
+  }
+
+  return getOwnedChannel(user, channelId)?.commandsEnabled ?? true
 }
 
 export function isChannelModerationEnabled(
@@ -225,6 +239,26 @@ async function fetchOwnedYoutubeChannels(accessToken: string): Promise<IYoutubeO
   return [mapIdentityToOwnedChannel(identity)]
 }
 
+function mergeOwnedYoutubeChannels(
+  existingUser: IUserDocument,
+  fetchedChannels: IYoutubeOwnedChannel[]
+): IYoutubeOwnedChannel[] {
+  return fetchedChannels.map((channel) => {
+    const existingChannel = getOwnedChannel(existingUser, channel.channelId)
+
+    if (!existingChannel) {
+      return channel
+    }
+
+    return {
+      ...channel,
+      qnaEnabled: existingChannel.qnaEnabled ?? true,
+      commandsEnabled: existingChannel.commandsEnabled ?? true,
+      moderationEnabled: existingChannel.moderationEnabled ?? true
+    }
+  })
+}
+
 function applyRefreshedTokenResult(
   user: IUserDocument,
   tokenResult: YoutubeTokenRefreshResult
@@ -276,7 +310,12 @@ export async function authenticateGoogleUser(
   const existingUser = await User.findOne({ googleSubject: profile.sub })
   const channels =
     !existingUser || shouldFetchOwnedYoutubeChannels(existingUser)
-      ? await fetchOwnedYoutubeChannels(tokenResponse.access_token)
+      ? existingUser
+        ? mergeOwnedYoutubeChannels(
+            existingUser,
+            await fetchOwnedYoutubeChannels(tokenResponse.access_token)
+          )
+        : await fetchOwnedYoutubeChannels(tokenResponse.access_token)
       : existingUser.channels.map((channel) => cloneOwnedChannel(channel))
 
   if (channels.length === 0) {
@@ -387,6 +426,7 @@ export function toAuthSessionDto(user: IUserDocument): AuthSessionDto {
         handle: channel.handle,
         thumbnail: channel.thumbnail,
         qnaEnabled: channel.qnaEnabled ?? true,
+        commandsEnabled: channel.commandsEnabled ?? true,
         moderationEnabled: channel.moderationEnabled ?? true
       })),
       activeChannelId: user.activeChannelId

@@ -2,6 +2,8 @@ import {
   ChatCommand,
   type IChatCommandDocument
 } from '../models/chat-command.js'
+import { User } from '../models/user.js'
+import { isChannelCommandsEnabled } from './google-auth-service.js'
 
 const OBJECT_ID_PATTERN = /^[a-f\d]{24}$/i
 
@@ -250,6 +252,14 @@ export async function matchChatCommand(
   const normalizedMessage = normalizeChatCommandTrigger(input.messageText)
 
   if (normalizedMessage.length === 0 || !normalizedMessage.startsWith('!')) {
+    return { matched: false }
+  }
+
+  const channelOwner = await User.findOne({ channels: { $elemMatch: { channelId } } })
+    .select({ channels: 1 })
+    .exec()
+
+  if (channelOwner && !isChannelCommandsEnabled(channelOwner, channelId)) {
     return { matched: false }
   }
 

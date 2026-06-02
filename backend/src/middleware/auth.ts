@@ -25,14 +25,15 @@ export const requireAuthenticatedUser: RequestHandler = async (
         picture: null,
         scope: [],
         channels: [
-          {
-            channelId: '*',
-            name: 'Test Channel',
-            handle: null,
-            thumbnail: null,
-            qnaEnabled: true,
-            moderationEnabled: true
-          }
+            {
+              channelId: '*',
+              name: 'Test Channel',
+              handle: null,
+              thumbnail: null,
+              qnaEnabled: true,
+              commandsEnabled: true,
+              moderationEnabled: true
+            }
         ],
         activeChannelId: '*',
         lastLoginAt: new Date(),

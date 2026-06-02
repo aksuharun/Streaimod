@@ -1,4 +1,5 @@
 import { ChatCommand } from '../../src/models/chat-command.js'
+import { User } from '../../src/models/user.js'
 import {
   createChatCommand,
   deleteChatCommand,
@@ -17,6 +18,7 @@ import {
 describe('chat-command-service', () => {
   beforeAll(() => {
     registerTestModel(ChatCommand)
+    registerTestModel(User)
   })
 
   beforeEach(async () => {
@@ -149,6 +151,44 @@ describe('chat-command-service', () => {
       matchChatCommand({
         channelId: created.channelId,
         messageText: 'hello chat'
+      })
+    ).resolves.toEqual({ matched: false })
+  })
+
+  it('does not match commands when command replies are disabled for the channel', async () => {
+    const channelId = uniqueTestId('ch')
+
+    await User.create({
+      googleSubject: uniqueTestId('sub'),
+      email: 'commands-disabled@example.com',
+      name: 'Disabled Commands User',
+      picture: null,
+      scope: [],
+      channels: [
+        {
+          channelId,
+          name: 'Disabled Channel',
+          handle: null,
+          thumbnail: null,
+          qnaEnabled: true,
+          commandsEnabled: false,
+          moderationEnabled: true
+        }
+      ],
+      activeChannelId: channelId,
+      lastLoginAt: new Date()
+    })
+
+    await createChatCommand({
+      channelId,
+      trigger: '!linktree',
+      replyText: 'https://linktr.ee/mylink'
+    })
+
+    await expect(
+      matchChatCommand({
+        channelId,
+        messageText: '!linktree'
       })
     ).resolves.toEqual({ matched: false })
   })

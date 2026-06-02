@@ -12,6 +12,7 @@ export interface IYoutubeOwnedChannel {
   handle: string | null
   thumbnail: string | null
   qnaEnabled?: boolean
+  commandsEnabled?: boolean
   moderationEnabled?: boolean
 }
 
@@ -49,6 +50,7 @@ const ownedChannelSchema = new Schema<IYoutubeOwnedChannel>(
     handle: { type: String, default: null },
     thumbnail: { type: String, default: null },
     qnaEnabled: { type: Boolean, default: true },
+    commandsEnabled: { type: Boolean, default: true },
     moderationEnabled: { type: Boolean, default: true }
   },
   { _id: false }

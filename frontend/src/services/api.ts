@@ -11,6 +11,16 @@ export interface QnaEntry {
   updatedAt?: string
 }
 
+export interface ChatCommand {
+  id: string
+  channelId: string
+  trigger: string
+  replyText: string
+  enabled: boolean
+  createdAt?: string
+  updatedAt?: string
+}
+
 export type ModerationCategoryType = 'ban' | 'timeout'
 
 export interface ModerationCategory {
@@ -55,6 +65,7 @@ export interface AuthChannel {
   handle: string | null
   thumbnail: string | null
   qnaEnabled: boolean
+  commandsEnabled: boolean
   moderationEnabled: boolean
 }
 
@@ -194,6 +205,46 @@ class ApiClient {
     })
   }
 
+  // Chat Command APIs
+  async getChatCommands(channelId?: string): Promise<ChatCommand[]> {
+    const url = channelId
+      ? `/api/chat-commands?channelId=${encodeURIComponent(channelId)}`
+      : '/api/chat-commands'
+    return this.request<ChatCommand[]>(url)
+  }
+
+  async createChatCommand(data: {
+    channelId: string
+    trigger: string
+    replyText: string
+    enabled?: boolean
+  }): Promise<ChatCommand> {
+    return this.request<ChatCommand>('/api/chat-commands', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateChatCommand(
+    id: string,
+    data: {
+      trigger?: string
+      replyText?: string
+      enabled?: boolean
+    }
+  ): Promise<ChatCommand> {
+    return this.request<ChatCommand>(`/api/chat-commands/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteChatCommand(id: string): Promise<void> {
+    return this.request<void>(`/api/chat-commands/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+  }
+
   // Moderation Category APIs
   async getCategories(params?: { channelId?: string; type?: ModerationCategoryType }): Promise<ModerationCategory[]> {
     const query = new URLSearchParams()
@@ -267,6 +318,7 @@ class ApiClient {
     channelId: string,
     data: {
       qnaEnabled?: boolean
+      commandsEnabled?: boolean
       moderationEnabled?: boolean
     }
   ): Promise<AuthSession> {
