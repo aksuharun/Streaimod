@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.schema
+*.log
+legacy-reference/
+.opencode/
+.kilo/
+.playwright-mcp/
+frontend/playwright-report/
+frontend/test-results/

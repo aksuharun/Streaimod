@@ -1,0 +1,11 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "agent": {
+    "explore": {
+      "model": "opencode-go/deepseek-v4-pro"
+    },
+    "wtf-implementer-kimi-k-2.6": {
+      "model": "opencode-go/kimi-k2.6"
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "ai-mod",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "build:backend": "npm --workspace @ai-mod/backend run build",
+    "test": "npm --workspace @ai-mod/backend run test",
+    "test:backend": "npm --workspace @ai-mod/backend run test",
+    "test:backend:coverage": "npm --workspace @ai-mod/backend run test:coverage",
+    "typecheck:backend": "npm --workspace @ai-mod/backend run typecheck",
+    "dev:frontend": "npm --workspace frontend run dev",
+    "build:frontend": "npm --workspace frontend run build",
+    "test:frontend:e2e": "npm --workspace frontend run test:e2e"
+  },
+  "devDependencies": {
+    "@varlock/keepass-plugin": "^1.0.0"
+  },
+  "dependencies": {
+    "unified-creator-metrics": "^0.3.2"
+  }
+}
