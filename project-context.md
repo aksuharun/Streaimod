@@ -64,21 +64,21 @@ These 13 categories will be seeded into `ModerationCatalog` at startup. They are
 
 | Catalog ID | Label | Definition | Legacy Group |
 |---|---|---|---|
-| SCAM | Scam or phishing | Scam, phishing, fake giveaway, credential theft, or wallet seed theft. | ban fixture |
-| THREAT | Threat | Credible violence, incitement to violence, or targeted intimidation. | ban fixture |
-| MINOR_EXPLOITATION | Minor exploitation | Sexual content involving minors or child exploitation. | ban fixture |
-| MALWARE | Malware | Malware, dangerous links, malicious downloads, or executable attack files. | ban fixture |
-| DOXXING | Doxxing | Revealing private personal information such as home address, phone number, or identity documents. | ban schema only |
-| SEVERE_HATE | Severe hate | Severe hate speech, slurs, or targeted bigotry beyond ordinary insults. | ban schema only |
-| SELF_PROMO | Self-promotion | Self-promotion, advertising, follow begging, or channel ads. | timeout fixture |
-| INSULT | Insult | Direct insults, name-calling, or abusive personal remarks. | timeout fixture |
-| TROLLING | Trolling | Trolling, baiting, or provoking chat arguments. | timeout fixture |
-| SYMBOL_FLOOD | Symbol flood | Excessive caps, emoji spam, symbol spam, or walls of characters. | timeout fixture |
-| SEXUAL_LANGUAGE | Sexual language | Adult sexual language, graphic language, or sexual insults. | timeout fixture |
-| HARASSMENT | Harassment | Sustained personal attacks, stalking, or targeted harassment campaigns. | timeout schema only |
-| SPAM | Spam | Repetitive bot-like messages, link spam, or copy-pasted flooding. | timeout schema only |
+| SCAM | Scam or phishing | Attempts to trick people into sending money or crypto, sharing credentials or wallet keys, or trusting fake giveaways, verification flows, recovery help, or guaranteed-return offers such as "send 1 BTC and get 2 BTC back." | ban fixture |
+| THREAT | Threat | Threats of violence, wishes of harm, incitement, or targeted intimidation that imply real-world danger or retaliation. | ban fixture |
+| MINOR_EXPLOITATION | Minor exploitation | Any sexual content involving minors, grooming, or child exploitation material or requests. | ban fixture |
+| MALWARE | Malware | Attempts to distribute or recommend malicious files, stealers, keyloggers, phishing kits, suspicious executables, or harmful download links. | ban fixture |
+| DOXXING | Doxxing | Sharing or soliciting private identifying information such as addresses, phone numbers, personal email, legal identity, documents, workplace, school, or family details. | ban schema only |
+| SEVERE_HATE | Severe hate | Slurs, dehumanization, or explicit hostility toward protected groups based on identity such as race, ethnicity, religion, nationality, gender, sexuality, or disability. | ban schema only |
+| SELF_PROMO | Self-promotion | Promoting your own channel, social account, server, store, referral code, or asking viewers to follow, sub, DM, or go elsewhere for non-deceptive promotion. | timeout fixture |
+| INSULT | Insult | One-off personal abuse or name-calling aimed at a person, such as "idiot" or "shut up," without identity-based hate or sustained targeting. | timeout fixture |
+| TROLLING | Trolling | Bad-faith baiting or provocation meant to derail chat, farm reactions, or start arguments without a direct threat or clear personal insult. | timeout fixture |
+| SYMBOL_FLOOD | Symbol flood | Messages dominated by repeated caps, emoji, punctuation, symbols, or unreadable character walls rather than meaningful text. | timeout fixture |
+| SEXUAL_LANGUAGE | Sexual language | Explicit sexual language, propositions, graphic descriptions, or sexual insults involving adults. Use minor exploitation instead if minors are involved. | timeout fixture |
+| HARASSMENT | Harassment | Repeated or targeted abuse, stalking, dogpiling, or persistent unwanted targeting of a person across messages or over time. | timeout schema only |
+| SPAM | Spam | Repetitive, copy-pasted, automated, or high-frequency posting, including repeated links or the same message across chat. Use self-promotion when the main issue is advertising. | timeout schema only |
 
-Definitions for `DOXXING`, `SEVERE_HATE`, `HARASSMENT`, and `SPAM` are proposed text — adjust before seeding.
+These definitions are the current canonical defaults passed into per-channel category bootstraps; tune them carefully because they shape the moderation prompts.
 
 ## Q&A Agent Workflow
 

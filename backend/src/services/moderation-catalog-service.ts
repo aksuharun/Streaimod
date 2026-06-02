@@ -11,73 +11,79 @@ export const CANONICAL_MODERATION_CATALOG: readonly ModerationCatalogSeedEntry[]
     catalogId: 'SCAM',
     label: 'Scam or phishing',
     definition:
-      'Scam, phishing, fake giveaway, credential theft, or wallet seed theft.'
+      'Attempts to trick people into sending money or crypto, sharing credentials or wallet keys, or trusting fake giveaways, verification flows, recovery help, or guaranteed-return offers such as "send 1 BTC and get 2 BTC back."'
   },
   {
     catalogId: 'THREAT',
     label: 'Threat',
     definition:
-      'Credible violence, incitement to violence, or targeted intimidation.'
+      'Threats of violence, wishes of harm, incitement, or targeted intimidation that imply real-world danger or retaliation.'
   },
   {
     catalogId: 'MINOR_EXPLOITATION',
     label: 'Minor exploitation',
-    definition: 'Sexual content involving minors or child exploitation.'
+    definition:
+      'Any sexual content involving minors, grooming, or child exploitation material or requests.'
   },
   {
     catalogId: 'MALWARE',
     label: 'Malware',
     definition:
-      'Malware, dangerous links, malicious downloads, or executable attack files.'
+      'Attempts to distribute or recommend malicious files, stealers, keyloggers, phishing kits, suspicious executables, or harmful download links.'
   },
   {
     catalogId: 'DOXXING',
     label: 'Doxxing',
     definition:
-      'Revealing private personal information such as home address, phone number, or identity documents.'
+      'Sharing or soliciting private identifying information such as addresses, phone numbers, personal email, legal identity, documents, workplace, school, or family details.'
   },
   {
     catalogId: 'SEVERE_HATE',
     label: 'Severe hate',
     definition:
-      'Severe hate speech, slurs, or targeted bigotry beyond ordinary insults.'
+      'Slurs, dehumanization, or explicit hostility toward protected groups based on identity such as race, ethnicity, religion, nationality, gender, sexuality, or disability.'
   },
   {
     catalogId: 'SELF_PROMO',
     label: 'Self-promotion',
-    definition: 'Self-promotion, advertising, follow begging, or channel ads.'
+    definition:
+      'Promoting your own channel, social account, server, store, referral code, or asking viewers to follow, sub, DM, or go elsewhere for non-deceptive promotion.'
   },
   {
     catalogId: 'INSULT',
     label: 'Insult',
-    definition: 'Direct insults, name-calling, or abusive personal remarks.'
+    definition:
+      'One-off personal abuse or name-calling aimed at a person, such as "idiot" or "shut up," without identity-based hate or sustained targeting.'
   },
   {
     catalogId: 'TROLLING',
     label: 'Trolling',
-    definition: 'Trolling, baiting, or provoking chat arguments.'
+    definition:
+      'Bad-faith baiting or provocation meant to derail chat, farm reactions, or start arguments without a direct threat or clear personal insult.'
   },
   {
     catalogId: 'SYMBOL_FLOOD',
     label: 'Symbol flood',
     definition:
-      'Excessive caps, emoji spam, symbol spam, or walls of characters.'
+      'Messages dominated by repeated caps, emoji, punctuation, symbols, or unreadable character walls rather than meaningful text.'
   },
   {
     catalogId: 'SEXUAL_LANGUAGE',
     label: 'Sexual language',
-    definition: 'Adult sexual language, graphic language, or sexual insults.'
+    definition:
+      'Explicit sexual language, propositions, graphic descriptions, or sexual insults involving adults. Use minor exploitation instead if minors are involved.'
   },
   {
     catalogId: 'HARASSMENT',
     label: 'Harassment',
     definition:
-      'Sustained personal attacks, stalking, or targeted harassment campaigns.'
+      'Repeated or targeted abuse, stalking, dogpiling, or persistent unwanted targeting of a person across messages or over time.'
   },
   {
     catalogId: 'SPAM',
     label: 'Spam',
-    definition: 'Repetitive bot-like messages, link spam, or copy-pasted flooding.'
+    definition:
+      'Repetitive, copy-pasted, automated, or high-frequency posting, including repeated links or the same message across chat. Use self-promotion when the main issue is advertising.'
   }
 ] as const
 

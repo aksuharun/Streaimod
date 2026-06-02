@@ -606,7 +606,7 @@ describe('Evo Moderation API', () => {
         type: 'ban',
         label: 'Scam or phishing',
         definition:
-          'Scam, phishing, fake giveaway, credential theft, or wallet seed theft.'
+          'Attempts to trick people into sending money or crypto, sharing credentials or wallet keys, or trusting fake giveaways, verification flows, recovery help, or guaranteed-return offers such as "send 1 BTC and get 2 BTC back."'
       })
 
       const response = await request(app)
@@ -641,14 +641,15 @@ describe('Evo Moderation API', () => {
         type: 'ban',
         label: 'Threat',
         definition:
-          'Credible violence, incitement to violence, or targeted intimidation.'
+          'Threats of violence, wishes of harm, incitement, or targeted intimidation that imply real-world danger or retaliation.'
       })
       await createCategoryViaApi(app, {
         channelId,
         catalogId: 'INSULT',
         type: 'timeout',
         label: 'Insult',
-        definition: 'Direct insults, name-calling, or abusive personal remarks.'
+        definition:
+          'One-off personal abuse or name-calling aimed at a person, such as "idiot" or "shut up," without identity-based hate or sustained targeting.'
       })
 
       const response = await request(app)
@@ -706,7 +707,7 @@ describe('Evo Moderation API', () => {
         type: 'timeout',
         label: 'Self-promotion',
         definition:
-          'Self-promotion, advertising, follow begging, or channel ads.'
+          'Promoting your own channel, social account, server, store, referral code, or asking viewers to follow, sub, DM, or go elsewhere for non-deceptive promotion.'
       })
 
       const response = await request(app)
@@ -741,7 +742,7 @@ describe('Evo Moderation API', () => {
         type: 'timeout',
         label: 'Insult',
         definition:
-          'Direct insults, name-calling, or abusive personal remarks.'
+          'One-off personal abuse or name-calling aimed at a person, such as "idiot" or "shut up," without identity-based hate or sustained targeting.'
       })
 
       const response = await request(app)
@@ -772,7 +773,7 @@ describe('Evo Moderation API', () => {
         type: 'timeout',
         label: 'Symbol flood',
         definition:
-          'Excessive caps, emoji spam, symbol spam, or walls of characters.'
+          'Messages dominated by repeated caps, emoji, punctuation, symbols, or unreadable character walls rather than meaningful text.'
       })
 
       const response = await request(app)
@@ -813,7 +814,7 @@ describe('Evo Moderation API', () => {
         type: 'ban',
         label: 'Scam or phishing',
         definition:
-          'Scam, phishing, fake giveaway, credential theft, or wallet seed theft.'
+          'Attempts to trick people into sending money or crypto, sharing credentials or wallet keys, or trusting fake giveaways, verification flows, recovery help, or guaranteed-return offers such as "send 1 BTC and get 2 BTC back."'
       })
       await createCategoryViaApi(app, {
         channelId,
@@ -821,7 +822,7 @@ describe('Evo Moderation API', () => {
         type: 'ban',
         label: 'Threat',
         definition:
-          'Credible violence, incitement to violence, or targeted intimidation.'
+          'Threats of violence, wishes of harm, incitement, or targeted intimidation that imply real-world danger or retaliation.'
       })
       await createCategoryViaApi(app, {
         channelId,
@@ -829,7 +830,7 @@ describe('Evo Moderation API', () => {
         type: 'timeout',
         label: 'Self-promotion',
         definition:
-          'Self-promotion, advertising, follow begging, or channel ads.'
+          'Promoting your own channel, social account, server, store, referral code, or asking viewers to follow, sub, DM, or go elsewhere for non-deceptive promotion.'
       })
       await createCategoryViaApi(app, {
         channelId,
@@ -837,7 +838,7 @@ describe('Evo Moderation API', () => {
         type: 'timeout',
         label: 'Insult',
         definition:
-          'Direct insults, name-calling, or abusive personal remarks.'
+          'One-off personal abuse or name-calling aimed at a person, such as "idiot" or "shut up," without identity-based hate or sustained targeting.'
       })
 
       const response = await request(app)
