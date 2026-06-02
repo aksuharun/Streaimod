@@ -12,6 +12,8 @@ import {
 } from './google-auth-service.js'
 
 const DEFAULT_STREAM_OVERVIEW_CACHE_TTL_MS = 60_000
+const YOUTUBE_API_KEY_ENV_NAME = 'YOUTUBE_API_KEY'
+const YOUTUBE_API_KEY_FALLBACK_ENV_NAME = 'YOUTUBE_API_KEY_1'
 
 export interface StreamSummaryDto {
   id: string
@@ -86,12 +88,34 @@ export function clearStreamOverviewCache(): void {
   streamOverviewCache.clear()
 }
 
+function resolveYoutubeApiKey(): string | null {
+  const primaryApiKey = process.env[YOUTUBE_API_KEY_ENV_NAME]?.trim()
+
+  if (primaryApiKey) {
+    return primaryApiKey
+  }
+
+  return process.env[YOUTUBE_API_KEY_FALLBACK_ENV_NAME]?.trim() || null
+}
+
 function buildDegradedOverview(warning: string): StreamOverviewDto {
   return {
     active: [],
     scheduled: [],
     fetchedAt: new Date().toISOString(),
     warning
+  }
+}
+
+function buildStreamOverview(
+  active: Livestream[],
+  scheduled: Livestream[],
+  channelId: string
+): StreamOverviewDto {
+  return {
+    active: filterStreamsForChannel(active, channelId).map((stream) => toStreamSummary(stream)),
+    scheduled: filterStreamsForChannel(scheduled, channelId).map((stream) => toStreamSummary(stream)),
+    fetchedAt: new Date().toISOString()
   }
 }
 
@@ -192,6 +216,39 @@ function buildPlatformWarning(error: PlatformApiError): string {
   }
 
   return 'Unable to load YouTube stream data right now. Try again in a moment.'
+}
+
+function isYoutubeQuotaError(error: unknown): error is PlatformApiError {
+  if (!(error instanceof PlatformApiError)) {
+    return false
+  }
+
+  const detail = extractPlatformErrorDetail(error)
+  const reason = detail.reason?.toLowerCase() ?? null
+
+  return (
+    reason === 'quotaexceeded' ||
+    reason === 'dailylimitexceeded' ||
+    reason === 'ratelimitexceeded'
+  )
+}
+
+async function loadPublicStreamOverviewWithApiKeys(
+  channelId: string
+): Promise<StreamOverviewDto | null> {
+  const apiKey = resolveYoutubeApiKey()
+
+  if (!apiKey) {
+    return null
+  }
+
+  const youtube = createYoutubeClient({ apiKey })
+  const [active, scheduled] = await Promise.all([
+    youtube.livestreams.getActive({ channelId }),
+    youtube.livestreams.getScheduled({ channelId })
+  ])
+
+  return buildStreamOverview(active, scheduled, channelId)
 }
 
 function mapOverviewError(error: unknown): StreamOverviewDto | null {
@@ -304,22 +361,35 @@ async function loadStreamOverview(
 
     return {
       cacheable: true,
-      overview: {
-        active: filterStreamsForChannel(active, channelId).map((stream) => toStreamSummary(stream)),
-        scheduled: filterStreamsForChannel(scheduled, channelId).map((stream) => toStreamSummary(stream)),
-        fetchedAt: new Date().toISOString()
-      }
+      overview: buildStreamOverview(active, scheduled, channelId)
     }
   } catch (error) {
-    const degradedOverview = mapOverviewError(error)
+    let effectiveError = error
+
+    if (isYoutubeQuotaError(error)) {
+      try {
+        const fallbackOverview = await loadPublicStreamOverviewWithApiKeys(channelId)
+
+        if (fallbackOverview) {
+          return {
+            cacheable: true,
+            overview: fallbackOverview
+          }
+        }
+      } catch (fallbackError) {
+        effectiveError = fallbackError
+      }
+    }
+
+    const degradedOverview = mapOverviewError(effectiveError)
 
     if (degradedOverview) {
       return {
-        cacheable: !(error instanceof GoogleAuthServiceError),
+        cacheable: !(effectiveError instanceof GoogleAuthServiceError),
         overview: degradedOverview
       }
     }
 
-    throw error
+    throw effectiveError
   }
 }

@@ -32,14 +32,37 @@ import {
   clearStreamOverviewCache,
   getStreamOverview
 } from '../../src/services/livestream-service.js'
+import { withTemporaryEnv } from '../helpers/env.js'
 
 function createYoutubeClientMock() {
   return {
     livestreams: {
+      getActive: vi.fn(),
+      getScheduled: vi.fn(),
       getAuthenticatedChannelActive: vi.fn(),
       getAuthenticatedChannelScheduled: vi.fn()
     }
   }
+}
+
+function createYoutubeQuotaError(
+  message = 'The request cannot be completed because you have exceeded your quota.'
+) {
+  return new PlatformApiError('YouTube API request failed.', {
+    platform: 'youtube',
+    status: 403,
+    cause: {
+      response: {
+        status: 403,
+        data: {
+          error: {
+            message,
+            errors: [{ reason: 'quotaExceeded' }]
+          }
+        }
+      }
+    }
+  })
 }
 
 describe('getStreamOverview', () => {
@@ -412,6 +435,92 @@ describe('getStreamOverview', () => {
       reason: 'insufficientPermissions',
       message: 'Request had insufficient authentication scopes.'
     })
+  })
+
+  it('falls back to YOUTUBE_API_KEY_1 when YOUTUBE_API_KEY is missing', async () => {
+    const authYoutube = createYoutubeClientMock()
+    const fallbackYoutube = createYoutubeClientMock()
+    const quotaError = createYoutubeQuotaError()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    mocks.getFreshUserAccessToken.mockResolvedValue('access-token')
+    mocks.createYoutubeClient.mockImplementation((config) => {
+      if (config.accessToken === 'access-token') {
+        return authYoutube
+      }
+
+      if (config.apiKey === 'spare-api-key') {
+        return fallbackYoutube
+      }
+
+      throw new Error(`Unexpected YouTube client config: ${JSON.stringify(config)}`)
+    })
+
+    authYoutube.livestreams.getAuthenticatedChannelActive.mockRejectedValue(quotaError)
+    authYoutube.livestreams.getAuthenticatedChannelScheduled.mockResolvedValue([])
+    fallbackYoutube.livestreams.getActive.mockResolvedValue([
+      {
+        streamId: 'public-live-video-1',
+        platform: 'youtube',
+        channelId: 'channel-1',
+        title: 'Public live stream',
+        status: 'live',
+        concurrentViewers: null,
+        startedAt: '2026-05-31T12:00:00.000Z',
+        fetchedAt: '2026-05-31T12:01:00.000Z'
+      }
+    ])
+    fallbackYoutube.livestreams.getScheduled.mockResolvedValue([
+      {
+        streamId: 'public-scheduled-video-1',
+        platform: 'youtube',
+        channelId: 'channel-1',
+        title: 'Public scheduled stream',
+        status: 'upcoming',
+        concurrentViewers: null,
+        startedAt: '2026-05-31T13:00:00.000Z',
+        fetchedAt: '2026-05-31T12:01:00.000Z'
+      }
+    ])
+
+    const result = await withTemporaryEnv(
+      {
+        YOUTUBE_API_KEY_1: 'spare-api-key'
+      },
+      () => getStreamOverview({} as any, 'channel-1')
+    )
+
+    expect(mocks.createYoutubeClient).toHaveBeenNthCalledWith(1, {
+      accessToken: 'access-token'
+    })
+    expect(mocks.createYoutubeClient).toHaveBeenNthCalledWith(2, {
+      apiKey: 'spare-api-key'
+    })
+    expect(fallbackYoutube.livestreams.getActive).toHaveBeenCalledWith({
+      channelId: 'channel-1'
+    })
+    expect(fallbackYoutube.livestreams.getScheduled).toHaveBeenCalledWith({
+      channelId: 'channel-1'
+    })
+    expect(result).toMatchObject({
+      active: [
+        {
+          id: 'public-live-video-1',
+          title: 'Public live stream',
+          status: 'live',
+          viewerCount: null
+        }
+      ],
+      scheduled: [
+        {
+          id: 'public-scheduled-video-1',
+          title: 'Public scheduled stream',
+          status: 'upcoming',
+          viewerCount: null
+        }
+      ]
+    })
+    expect(warnSpy).not.toHaveBeenCalled()
   })
 
   it('returns a project configuration warning when the YouTube API is disabled', async () => {

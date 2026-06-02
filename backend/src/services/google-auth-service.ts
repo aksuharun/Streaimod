@@ -88,11 +88,23 @@ function normalizeScope(scope: string | undefined | null): string[] {
 }
 
 function resolveGoogleClientId(): string {
-  return getRequiredEnv('YOUTUBE_CLIENT_ID')
+  const primaryClientId = process.env.YOUTUBE_CLIENT_ID?.trim()
+
+  if (primaryClientId) {
+    return primaryClientId
+  }
+
+  return getRequiredEnv('YOUTUBE_CLIENT_ID_1')
 }
 
 function resolveGoogleClientSecret(): string {
-  return getRequiredEnv('YOUTUBE_CLIENT_SECRET')
+  const primaryClientSecret = process.env.YOUTUBE_CLIENT_SECRET?.trim()
+
+  if (primaryClientSecret) {
+    return primaryClientSecret
+  }
+
+  return getRequiredEnv('YOUTUBE_CLIENT_SECRET_1')
 }
 
 function resolveGoogleRedirectUri(): string {
