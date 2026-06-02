@@ -58,6 +58,8 @@ interface CommandDraft {
   enabled: boolean
 }
 
+type ChannelFeatureToggle = 'qnaEnabled' | 'commandsEnabled' | 'moderationEnabled'
+
 const appLinks: Array<{ href: AppRoute; label: string; icon: typeof LayoutDashboard }> = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/qna', label: 'Q&A Rules', icon: MessageSquareText },
@@ -110,6 +112,40 @@ const roadmapItems = [
     title: 'Moderation workflow refinements',
     description: 'Tighten the path from category edits to runtime decisions so operators can adjust enforcement with less friction.',
     tag: 'Operator UX'
+  }
+]
+
+const activeFeatureConfigs: Array<{
+  key: ChannelFeatureToggle
+  href: AppRoute
+  title: string
+  description: string
+  pausedDescription: string
+  icon: typeof MessageSquareText
+}> = [
+  {
+    key: 'qnaEnabled',
+    href: '/qna',
+    title: 'Q&A replies',
+    description: 'Saved answers can reply to matching viewer questions.',
+    pausedDescription: 'Saved Q&A rules stay stored, but live automatic replies are paused.',
+    icon: MessageSquareText
+  },
+  {
+    key: 'commandsEnabled',
+    href: '/commands',
+    title: 'Commands',
+    description: 'Exact chat triggers can send their saved replies.',
+    pausedDescription: 'Saved commands stay stored, but command-based auto replies are paused.',
+    icon: Terminal
+  },
+  {
+    key: 'moderationEnabled',
+    href: '/moderation',
+    title: 'Moderation rules',
+    description: 'Assigned categories can evaluate live chat and enforce actions.',
+    pausedDescription: 'Assigned moderation categories stay saved, but runtime enforcement is paused.',
+    icon: ShieldAlert
   }
 ]
 
@@ -616,7 +652,13 @@ function OnboardingScreen(props: {
 
 function DashboardPage(props: {
   activeChannel: AuthChannel
+  channelSettingsUpdating: boolean
   onNavigate: (path: AppRoute) => void
+  onUpdateChannelSettings: (data: {
+    qnaEnabled?: boolean
+    commandsEnabled?: boolean
+    moderationEnabled?: boolean
+  }) => Promise<void>
 }) {
   const [health, setHealth] = useState<HealthStatus>('unknown')
   const [streams, setStreams] = useState<StreamSummary[]>([])
@@ -632,6 +674,9 @@ function DashboardPage(props: {
   const activeStreams = streams.filter((stream) => stream.status === 'live')
   const scheduledStreams = streams.filter((stream) => stream.status === 'upcoming')
   const visibleStreams = [...activeStreams, ...scheduledStreams]
+  const activeFeatures = activeFeatureConfigs.filter(
+    (feature) => props.activeChannel[feature.key]
+  )
 
   let streamState: StreamStatusLabel = 'unknown'
   if (streamsLoading) streamState = 'loading'
@@ -790,6 +835,31 @@ function DashboardPage(props: {
     }
   }
 
+  async function pauseFeature(featureKey: ChannelFeatureToggle) {
+    const feature = activeFeatureConfigs.find((item) => item.key === featureKey)
+    if (!feature) return
+
+    try {
+      if (feature.key === 'qnaEnabled') {
+        await props.onUpdateChannelSettings({ qnaEnabled: false })
+      } else if (feature.key === 'commandsEnabled') {
+        await props.onUpdateChannelSettings({ commandsEnabled: false })
+      } else {
+        await props.onUpdateChannelSettings({ moderationEnabled: false })
+      }
+
+      showSuccessToast({
+        title: `${feature.title} paused`,
+        description: feature.pausedDescription
+      })
+    } catch (error) {
+      showErrorToast({
+        title: 'Pause failed',
+        description: error instanceof Error ? error.message : `Failed to pause ${feature.title.toLowerCase()}.`
+      })
+    }
+  }
+
   return (
     <div className="page-wrap">
       <header className="page-header">
@@ -923,30 +993,57 @@ function DashboardPage(props: {
         <aside className="panel quick-panel">
           <div className="panel-head">
             <div>
-              <p className="eyebrow">Shortcuts</p>
-              <h2>Quick actions</h2>
+              <p className="eyebrow">Active now</p>
+              <h2>Live features</h2>
+              <p>Enabled channel features appear here so you can pause them without leaving the dashboard.</p>
             </div>
           </div>
 
-          <button type="button" className="action-row" onClick={() => props.onNavigate('/qna')}>
-            <span>
-              <strong>Q&A replies</strong>
-              <small>Manage saved answers.</small>
-            </span>
-            <em>
-              <ArrowUpRight size={16} strokeWidth={2} />
-            </em>
-          </button>
+          {activeFeatures.length === 0 ? (
+            <EmptyPanel
+              title="No live features enabled"
+              description="Use the sidebar sections to enable Q&A, commands, or moderation for this channel."
+            />
+          ) : (
+            <div className="feature-action-list">
+              {activeFeatures.map((feature) => {
+                const FeatureIcon = feature.icon
 
-          <button type="button" className="action-row" onClick={() => props.onNavigate('/moderation')}>
-            <span>
-              <strong>Moderation rules</strong>
-              <small>Adjust timeout and ban routing.</small>
-            </span>
-            <em>
-              <ArrowUpRight size={16} strokeWidth={2} />
-            </em>
-          </button>
+                return (
+                  <article key={feature.key} className="feature-action-card">
+                    <div className="feature-action-copy">
+                      <span className="feature-action-icon">
+                        <FeatureIcon size={18} strokeWidth={2} />
+                      </span>
+                      <span>
+                        <strong>{feature.title}</strong>
+                        <small>{feature.description}</small>
+                      </span>
+                    </div>
+
+                    <div className="feature-action-controls">
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => props.onNavigate(feature.href)}
+                      >
+                        <ArrowUpRight size={16} strokeWidth={2} />
+                        Open
+                      </button>
+                      <button
+                        type="button"
+                        className="danger-link"
+                        disabled={props.channelSettingsUpdating}
+                        onClick={() => void pauseFeature(feature.key)}
+                      >
+                        {props.channelSettingsUpdating ? 'Saving...' : 'Pause'}
+                      </button>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
         </aside>
       </section>
     </div>
@@ -1832,6 +1929,9 @@ function ModerationPage(props: {
   const categoryLane = boardItems.filter((item) => item.type === null)
   const timeoutLane = boardItems.filter((item) => item.type === 'timeout')
   const banLane = boardItems.filter((item) => item.type === 'ban')
+  const hasEnabledAgentCategory = categories.some((category) => category.enabled)
+  const moderationEnableBlocked =
+    !props.activeChannel.moderationEnabled && !loading && !error && !hasEnabledAgentCategory
 
   async function moveCard(catalogId: string, targetColumn: BoardColumn) {
     if (!catalogId || movingIds[catalogId]) return
@@ -1931,6 +2031,15 @@ function ModerationPage(props: {
   }
 
   async function toggleAgent() {
+    if (!props.activeChannel.moderationEnabled && !hasEnabledAgentCategory) {
+      showErrorToast({
+        title: 'Agent update failed',
+        description:
+          'Enable at least one moderation category before enabling the moderation agent.'
+      })
+      return
+    }
+
     try {
       await props.onUpdateChannelSettings({
         moderationEnabled: !props.activeChannel.moderationEnabled
@@ -2063,10 +2172,13 @@ function ModerationPage(props: {
               ? 'The moderation workflow is active and can issue timeout or ban decisions from assigned categories.'
               : 'The moderation workflow is paused. Your board stays saved, but runtime enforcement is disabled.'}
           </p>
+          {moderationEnableBlocked && (
+            <p>Enable at least one assigned moderation category before turning this workflow on.</p>
+          )}
         </div>
         <StatusSwitch
           checked={props.activeChannel.moderationEnabled}
-          disabled={props.channelSettingsUpdating}
+          disabled={props.channelSettingsUpdating || moderationEnableBlocked}
           activeLabel={props.channelSettingsUpdating ? 'Saving...' : 'Enabled'}
           inactiveLabel={props.channelSettingsUpdating ? 'Saving...' : 'Paused'}
           onToggle={() => void toggleAgent()}
@@ -2302,7 +2414,14 @@ export default function App() {
   } else {
     let page: ReactNode
     if (path === '/dashboard') {
-      page = <DashboardPage activeChannel={activeChannel} onNavigate={navigate} />
+      page = (
+        <DashboardPage
+          activeChannel={activeChannel}
+          channelSettingsUpdating={!!channelSettingsUpdating[activeChannel.channelId]}
+          onNavigate={navigate}
+          onUpdateChannelSettings={updateChannelSettings}
+        />
+      )
     } else if (path === '/qna') {
       page = (
         <QnaPage

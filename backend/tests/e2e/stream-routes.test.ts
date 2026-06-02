@@ -70,11 +70,13 @@ describe('stream routes', () => {
       streamId: 'live-video-1',
       startedAt: '2026-05-31T12:02:00.000Z'
     }))
+    const hasEnabledModerationCategories = vi.fn(async () => true)
 
     const app = createTestApp((expressApp) => {
       setStreamRouteDependencies(expressApp, {
         getStreamOverview,
-        startManagedStreamRuntime
+        startManagedStreamRuntime,
+        hasEnabledModerationCategories
       })
     })
 
@@ -97,14 +99,63 @@ describe('stream routes', () => {
     })
   })
 
+  it('rejects starting moderation when the channel has no enabled moderation categories', async () => {
+    const getStreamOverview = vi.fn(async (): Promise<StreamOverviewDto> => ({
+      active: [
+        {
+          id: 'live-video-1',
+          platform: 'youtube' as const,
+          title: 'Live stream',
+          status: 'live' as const,
+          viewerCount: 128,
+          startsAt: '2026-05-31T12:00:00.000Z',
+          fetchedAt: '2026-05-31T12:01:00.000Z'
+        }
+      ],
+      scheduled: [],
+      fetchedAt: '2026-05-31T12:01:00.000Z'
+    }))
+    const startManagedStreamRuntime = vi.fn(async () => ({
+      active: true,
+      channelId: '*',
+      streamId: 'live-video-1',
+      startedAt: '2026-05-31T12:02:00.000Z'
+    }))
+    const hasEnabledModerationCategories = vi.fn(async () => false)
+
+    const app = createTestApp((expressApp) => {
+      setStreamRouteDependencies(expressApp, {
+        getStreamOverview,
+        startManagedStreamRuntime,
+        hasEnabledModerationCategories
+      })
+    })
+
+    const response = await request(app)
+      .post('/api/stream/start')
+      .send({ streamId: 'live-video-1' })
+      .expect(409)
+
+    expect(hasEnabledModerationCategories).toHaveBeenCalledWith('*')
+    expect(getStreamOverview).not.toHaveBeenCalled()
+    expect(startManagedStreamRuntime).not.toHaveBeenCalled()
+    expect(response.body).toEqual({
+      error:
+        'Enable at least one moderation category before starting live moderation'
+    })
+  })
+
   it('rejects starting moderation for a stream that is not currently active', async () => {
     const app = createTestApp((expressApp) => {
+      const hasEnabledModerationCategories = vi.fn(async () => true)
+
       setStreamRouteDependencies(expressApp, {
         getStreamOverview: vi.fn(async (): Promise<StreamOverviewDto> => ({
           active: [],
           scheduled: [],
           fetchedAt: '2026-05-31T12:01:00.000Z'
-        }))
+        })),
+        hasEnabledModerationCategories
       })
     })
 

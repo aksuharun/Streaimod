@@ -251,6 +251,21 @@ export async function listCategories(
   return ModerationCategory.find(query).sort({ createdAt: -1, _id: -1 }).exec()
 }
 
+export async function hasEnabledModerationCategories(channelId: string): Promise<boolean> {
+  const trimmedChannelId = channelId.trim()
+
+  if (trimmedChannelId.length === 0) {
+    return false
+  }
+
+  const count = await ModerationCategory.countDocuments({
+    channelId: trimmedChannelId,
+    enabled: true
+  }).exec()
+
+  return count > 0
+}
+
 export async function getCategory(
   id: string
 ): Promise<IModerationCategoryDocument | null> {

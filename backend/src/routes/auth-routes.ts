@@ -21,6 +21,7 @@ import {
   createSessionCookieHeader,
   readOauthState
 } from '../services/auth-session-service.js'
+import { hasEnabledModerationCategories } from '../services/moderation-category-service.js'
 
 const router = Router()
 
@@ -195,6 +196,17 @@ router.patch('/channels/:channelId/settings', requireAuthenticatedUser, async (r
 
     if (!channel) {
       response.status(404).json({ error: 'Channel not found' })
+      return
+    }
+
+    if (
+      updates.moderationEnabled &&
+      !(await hasEnabledModerationCategories(channelId))
+    ) {
+      response.status(409).json({
+        error:
+          'Enable at least one moderation category before enabling the moderation agent'
+      })
       return
     }
 

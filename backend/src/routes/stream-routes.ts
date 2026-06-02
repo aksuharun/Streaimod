@@ -5,6 +5,7 @@ import {
   requireAuthenticatedUser,
   resolveOwnedChannelId
 } from '../middleware/auth.js'
+import { hasEnabledModerationCategories } from '../services/moderation-category-service.js'
 import { getStreamOverview } from '../services/livestream-service.js'
 import {
   getManagedStreamRuntimeStatus,
@@ -20,6 +21,7 @@ export interface StreamRouteLocals {
   startManagedStreamRuntime?: typeof startManagedStreamRuntime
   stopManagedStreamRuntime?: typeof stopManagedStreamRuntime
   getManagedStreamRuntimeStatus?: typeof getManagedStreamRuntimeStatus
+  hasEnabledModerationCategories?: typeof hasEnabledModerationCategories
 }
 
 function getRouteLocals(app: Application): StreamRouteLocals {
@@ -57,6 +59,15 @@ function resolveGetManagedStreamRuntimeStatus(
   return (
     getRouteLocals(app).getManagedStreamRuntimeStatus ??
     getManagedStreamRuntimeStatus
+  )
+}
+
+function resolveHasEnabledModerationCategories(
+  app: Application
+): typeof hasEnabledModerationCategories {
+  return (
+    getRouteLocals(app).hasEnabledModerationCategories ??
+    hasEnabledModerationCategories
   )
 }
 
@@ -154,6 +165,18 @@ streamRuntimeRouter.post('/start', async (request_, response, next) => {
 
     if (!streamId) {
       response.status(400).json({ error: 'streamId is required and must be a non-empty string' })
+      return
+    }
+
+    const hasEnabledCategories = await resolveHasEnabledModerationCategories(
+      request_.app
+    )(channelId)
+
+    if (!hasEnabledCategories) {
+      response.status(409).json({
+        error:
+          'Enable at least one moderation category before starting live moderation'
+      })
       return
     }
 
