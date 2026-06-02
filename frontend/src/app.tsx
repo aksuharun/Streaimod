@@ -2140,9 +2140,7 @@ function ModerationPage(props: {
                       Remove from agent
                     </button>
                   </div>
-                ) : (
-                  <span className="drag-hint">Drag into timeout or ban to activate this category.</span>
-                )}
+                ) : null}
               </article>
             )
           })}
