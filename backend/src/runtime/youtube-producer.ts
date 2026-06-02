@@ -84,10 +84,12 @@ interface ChatIngestResponse {
       unicodeCount: number
       normalized: boolean
       normalizedMessage: string
+      banCategoryIds: string[]
       banSkipped: boolean
       banAction: 'BAN' | 'TIMEOUT' | 'IGNORE' | null
       banCatalogId: string | null
       banReason: string | null
+      timeoutCategoryIds: string[]
       timeoutSkipped: boolean
       timeoutAction: 'BAN' | 'TIMEOUT' | 'IGNORE' | null
       timeoutCatalogId: string | null
@@ -484,6 +486,7 @@ async function executeIngestActions({
       liveChatId,
       moderationAgent: moderation.agent ?? null,
       payload: {
+        selectedCategories: moderation.workflow.banCategoryIds,
         skipped: moderation.workflow.banSkipped,
         action: moderation.workflow.banAction,
         catalogId: moderation.workflow.banCatalogId,
@@ -498,6 +501,7 @@ async function executeIngestActions({
       liveChatId,
       moderationAgent: moderation.agent ?? null,
       payload: {
+        selectedCategories: moderation.workflow.timeoutCategoryIds,
         skipped: moderation.workflow.timeoutSkipped,
         action: moderation.workflow.timeoutAction,
         catalogId: moderation.workflow.timeoutCatalogId,

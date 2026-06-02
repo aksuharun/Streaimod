@@ -1295,6 +1295,8 @@ describe('runEvoModerationWorkflow', () => {
       receivedMessage: true,
       normalized: false,
       normalizedMessage: 'Free giveaway',
+      banCategoryIds: [],
+      timeoutCategoryIds: [],
       banCategoriesCount: 0,
       timeoutCategoriesCount: 0,
       banSkipped: true,

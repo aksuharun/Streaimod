@@ -106,6 +106,8 @@ export interface EvoModerationWorkflow {
   unicodeCount: number
   normalized: boolean
   normalizedMessage: string
+  banCategoryIds: string[]
+  timeoutCategoryIds: string[]
   banCategoriesCount: number
   timeoutCategoriesCount: number
   banSkipped: boolean
@@ -472,6 +474,8 @@ export async function runEvoModerationWorkflow(
         unicodeCount,
         normalized: false,
         normalizedMessage: message,
+        banCategoryIds: [],
+        timeoutCategoryIds: [],
         banCategoriesCount: 0,
         timeoutCategoriesCount: 0,
         banSkipped: true,
@@ -558,6 +562,8 @@ export async function runEvoModerationWorkflow(
         unicodeCount,
         normalized,
         normalizedMessage,
+        banCategoryIds: banCatalogIds,
+        timeoutCategoryIds: timeoutCatalogIds,
         banCategoriesCount: banCategories.length,
         timeoutCategoriesCount: timeoutCategories.length,
         banSkipped,
@@ -618,6 +624,8 @@ export async function runEvoModerationWorkflow(
       unicodeCount,
       normalized,
       normalizedMessage,
+      banCategoryIds: banCatalogIds,
+      timeoutCategoryIds: timeoutCatalogIds,
       banCategoriesCount: banCategories.length,
       timeoutCategoriesCount: timeoutCategories.length,
       banSkipped,
