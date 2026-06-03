@@ -894,6 +894,13 @@ a {
   gap: 20px;
 }
 
+.title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .page-header h1 {
   font-size: clamp(2rem, 4vw, 2.8rem);
 }
@@ -1036,6 +1043,12 @@ a {
   background: var(--surface);
 }
 
+.badge-experimental {
+  background: var(--info-bg);
+  border-color: rgba(55, 90, 150, 0.16);
+  color: var(--info-text);
+}
+
 .platform-tag {
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -1067,6 +1080,15 @@ a {
 
 .state-chip-saving {
   background: var(--surface);
+}
+
+.experimental-warning {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(55, 90, 150, 0.16);
+  background: var(--info-bg);
+  color: var(--info-text);
 }
 
 .action-row {

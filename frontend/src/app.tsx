@@ -2175,6 +2175,7 @@ function ModerationPage(props: {
   const [dragOverColumn, setDragOverColumn] = useState<BoardColumn | ''>('')
   const [movingIds, setMovingIds] = useState<Record<string, boolean>>({})
   const [togglingIds, setTogglingIds] = useState<Record<string, boolean>>({})
+  const [agentToggleIntent, setAgentToggleIntent] = useState<'enable' | 'disable' | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -2229,6 +2230,8 @@ function ModerationPage(props: {
   const hasEnabledAgentCategory = categories.some((category) => category.enabled)
   const moderationEnableBlocked =
     !props.activeChannel.moderationEnabled && !loading && !error && !hasEnabledAgentCategory
+  const showingExperimentalEnableWarning =
+    agentToggleIntent === 'enable' && props.channelSettingsUpdating
 
   async function moveCard(catalogId: string, targetColumn: BoardColumn) {
     if (!catalogId || movingIds[catalogId]) return
@@ -2337,13 +2340,16 @@ function ModerationPage(props: {
       return
     }
 
+    const enablingAgent = !props.activeChannel.moderationEnabled
+    setAgentToggleIntent(enablingAgent ? 'enable' : 'disable')
+
     try {
       await props.onUpdateChannelSettings({
-        moderationEnabled: !props.activeChannel.moderationEnabled
+        moderationEnabled: enablingAgent
       })
       showSuccessToast({
-        title: !props.activeChannel.moderationEnabled ? 'Moderation agent enabled' : 'Moderation agent paused',
-        description: !props.activeChannel.moderationEnabled
+        title: enablingAgent ? 'Moderation agent enabled' : 'Moderation agent paused',
+        description: enablingAgent
           ? 'Timeout and ban workflows will evaluate incoming live chat again.'
           : 'Assigned categories stay saved, but runtime enforcement is paused.'
       })
@@ -2352,6 +2358,8 @@ function ModerationPage(props: {
         title: 'Agent update failed',
         description: toggleError instanceof Error ? toggleError.message : 'Failed to update the moderation agent setting.'
       })
+    } finally {
+      setAgentToggleIntent(null)
     }
   }
 
@@ -2451,7 +2459,10 @@ function ModerationPage(props: {
       <header className="page-header">
         <div>
           <p className="eyebrow">Chat safety</p>
-          <h1>Moderation Rules</h1>
+          <div className="title-row">
+            <h1>Moderation Rules</h1>
+            <span className="badge badge-experimental">Experimental</span>
+          </div>
           <p className="page-text">
             Route each safety category to timeout or ban.
           </p>
@@ -2467,6 +2478,11 @@ function ModerationPage(props: {
               ? 'The moderation workflow is active and can issue timeout or ban decisions from assigned categories.'
               : 'The moderation workflow is paused. Your board stays saved, but runtime enforcement is disabled.'}
           </p>
+          {showingExperimentalEnableWarning && (
+            <p className="experimental-warning">
+              Experimental feature: enabling moderation can take a moment and may not succeed on the first attempt.
+            </p>
+          )}
           {moderationEnableBlocked && (
             <p>Enable at least one assigned moderation category before turning this workflow on.</p>
           )}
