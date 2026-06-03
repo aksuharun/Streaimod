@@ -338,6 +338,7 @@ function Modal(props: {
   description: string
   children: ReactNode
   onClose: () => void
+  wide?: boolean
 }) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -353,7 +354,7 @@ function Modal(props: {
   return (
     <div className="modal-shell" role="dialog" aria-modal="true" aria-label={props.title}>
       <div className="modal-backdrop" onClick={props.onClose} />
-      <div className="modal-card">
+      <div className={`modal-card ${props.wide ? 'modal-card-wide' : ''}`}>
         <div className="modal-header">
           <div>
             <p className="eyebrow">Editor</p>
@@ -1611,88 +1612,119 @@ function QnaPage(props: {
         <Modal
           title="Bulk edit Q&A rules"
           description="Paste a valid import object or load a JSON file. Matching questions update in place by normalized question."
+          wide
           onClose={() => {
             if (!bulkImporting) setBulkModalOpen(false)
           }}
         >
           <form className="editor-form bulk-editor-form" onSubmit={(event) => void submitBulkImport(event)}>
-            <section className="bulk-help-grid">
-              <article className="panel bulk-help-card">
-                <p className="eyebrow">Accepted schema</p>
-                <h3>What to import</h3>
-                <ul className="bulk-help-list">
-                  <li>The top-level object must contain `version` and `entries`.</li>
-                  <li>`version` must be `1`.</li>
-                  <li>Each entry must include `question` and `answer`.</li>
-                  <li>`enabled` is optional and defaults to `true`.</li>
-                  <li>Do not include `channelId`, `id`, or `normalizedQuestion`.</li>
-                </ul>
+            <section className="bulk-flow">
+              <article className="bulk-step">
+                <span className="bulk-step-index">1</span>
+                <div>
+                  <strong>Prepare the JSON</strong>
+                  <p>Write it yourself, upload a file, or generate it from your transcript.</p>
+                </div>
               </article>
-
-              <article className="panel bulk-help-card bulk-help-card-accent">
-                <p className="eyebrow">Generate with ChatGPT</p>
-                <h3>Bring your transcript or docs</h3>
-                <p>
-                  Open ChatGPT with a starter prompt, then attach your stream transcript, FAQ, or notes and ask it to return valid import JSON.
-                </p>
-                <div className="bulk-link-row">
-                  <a
-                    href={qnaBulkImportChatGptUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="ghost-button external-link-button"
-                  >
-                    <ArrowUpRight size={16} strokeWidth={2} />
-                    Open ChatGPT
-                  </a>
-                  <button type="button" className="ghost-button" onClick={() => void copyBulkImportPrompt()}>
-                    Copy prompt
-                  </button>
+              <article className="bulk-step">
+                <span className="bulk-step-index">2</span>
+                <div>
+                  <strong>Review the items</strong>
+                  <p>Questions update by normalized match, so duplicates become edits instead of extra rows.</p>
+                </div>
+              </article>
+              <article className="bulk-step">
+                <span className="bulk-step-index">3</span>
+                <div>
+                  <strong>Apply the bulk edit</strong>
+                  <p>New items are created, matching items are updated, and unchanged ones stay as-is.</p>
                 </div>
               </article>
             </section>
 
-            <label>
-              <span>Paste the import object</span>
-              <textarea
-                rows={14}
-                className="bulk-json-textarea"
-                value={bulkJsonText}
-                onChange={(event) => setBulkJsonText(event.target.value)}
-                placeholder={qnaBulkImportExample}
-                spellCheck={false}
-              />
-            </label>
+            <section className="bulk-layout">
+              <div className="bulk-primary-column">
+                <label className="bulk-editor-card">
+                  <span>Paste the import object</span>
+                  <textarea
+                    rows={12}
+                    className="bulk-json-textarea"
+                    value={bulkJsonText}
+                    onChange={(event) => setBulkJsonText(event.target.value)}
+                    placeholder={qnaBulkImportExample}
+                    spellCheck={false}
+                  />
+                </label>
 
-            <div className="bulk-upload-card">
-              <div className="bulk-input-header">
-                <div>
-                  <strong>Upload a JSON file</strong>
+                <div className="bulk-secondary-row">
+                  <div className="bulk-upload-card">
+                    <div className="bulk-input-header">
+                      <div>
+                        <strong>Upload a JSON file</strong>
+                        <p>
+                          Load a `.json` file instead of pasting. The file contents will appear in the editor above.
+                        </p>
+                      </div>
+                      {bulkFileName && <span className="bulk-file-pill">{bulkFileName}</span>}
+                    </div>
+                    <input
+                      type="file"
+                      accept=".json,application/json"
+                      onChange={(event) => void loadBulkImportFile(event)}
+                    />
+                  </div>
+
+                  <div className="bulk-example-card">
+                    <div className="bulk-input-header">
+                      <div>
+                        <strong>Example object</strong>
+                        <p>Use this as a quick template if you are building the JSON manually.</p>
+                      </div>
+                      <button type="button" className="ghost-button" onClick={() => setBulkJsonText(qnaBulkImportExample)}>
+                        Use example
+                      </button>
+                    </div>
+                    <pre className="code-block code-block-compact">{qnaBulkImportExample}</pre>
+                  </div>
+                </div>
+              </div>
+
+              <aside className="bulk-side-column">
+                <article className="panel bulk-help-card">
+                  <p className="eyebrow">Quick rules</p>
+                  <h3>Accepted schema</h3>
+                  <ul className="bulk-help-list">
+                    <li>Use one top-level object with a version field and an entries array.</li>
+                    <li>Version must be 1.</li>
+                    <li>Every entry needs a question and an answer.</li>
+                    <li>Enabled is optional and defaults to active.</li>
+                    <li>Leave out channelId, ids, timestamps, and normalized fields.</li>
+                  </ul>
+                </article>
+
+                <article className="panel bulk-help-card bulk-help-card-accent">
+                  <p className="eyebrow">Generate with ChatGPT</p>
+                  <h3>Turn stream material into Q&A</h3>
                   <p>
-                    Load a `.json` file instead of pasting. The file contents will appear in the editor above.
+                    Open ChatGPT with a starter prompt, attach your transcript, FAQ, or notes, and ask it to return a valid import object.
                   </p>
-                </div>
-                {bulkFileName && <span className="bulk-file-pill">{bulkFileName}</span>}
-              </div>
-              <input
-                type="file"
-                accept=".json,application/json"
-                onChange={(event) => void loadBulkImportFile(event)}
-              />
-            </div>
-
-            <div className="bulk-example-card">
-              <div className="bulk-input-header">
-                <div>
-                  <strong>Example object</strong>
-                  <p>Use this as a template if you are creating the JSON manually.</p>
-                </div>
-                <button type="button" className="ghost-button" onClick={() => setBulkJsonText(qnaBulkImportExample)}>
-                  Use example
-                </button>
-              </div>
-              <pre className="code-block">{qnaBulkImportExample}</pre>
-            </div>
+                  <div className="bulk-link-row">
+                    <a
+                      href={qnaBulkImportChatGptUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ghost-button external-link-button"
+                    >
+                      <ArrowUpRight size={16} strokeWidth={2} />
+                      Open ChatGPT
+                    </a>
+                    <button type="button" className="ghost-button" onClick={() => void copyBulkImportPrompt()}>
+                      Copy prompt
+                    </button>
+                  </div>
+                </article>
+              </aside>
+            </section>
 
             <div className="editor-actions">
               <button type="button" className="ghost-button" disabled={bulkImporting} onClick={() => setBulkModalOpen(false)}>
