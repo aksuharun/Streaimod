@@ -298,6 +298,45 @@ describe('ingestChat', () => {
     expect(runEvoModerationWorkflow).toHaveBeenCalledTimes(1)
   })
 
+  it('skips Q&A and moderation for self-messages while still running commands', async () => {
+    const {
+      dependencies,
+      matchChatCommand,
+      runQnaAgentWorkflow,
+      runEvoModerationWorkflow
+    } = createFakeDependencies()
+    const input = createValidInput({
+      authorExternalId: 'channel-owner-1',
+      channelExternalId: 'channel-owner-1'
+    })
+
+    const result = await ingestChat(input, dependencies)
+
+    expect(matchChatCommand).toHaveBeenCalledTimes(1)
+    expect(runQnaAgentWorkflow).not.toHaveBeenCalled()
+    expect(runEvoModerationWorkflow).not.toHaveBeenCalled()
+    expect(result.duplicate).toBe(false)
+    expect(result.qnaResult).toMatchObject({
+      agent: 'qna',
+      action: 'DO_NOTHING',
+      matched: false,
+      workflow: {
+        reason: 'SELF_MESSAGE_SKIPPED'
+      }
+    })
+    expect(result.moderationResult).toMatchObject({
+      agent: 'evo-moderation',
+      action: 'IGNORE',
+      reason: 'SELF_MESSAGE_SKIPPED',
+      stage: 'timeout',
+      workflow: {
+        banSkipped: true,
+        timeoutSkipped: true,
+        timeoutReason: 'SELF_MESSAGE_SKIPPED'
+      }
+    })
+  })
+
   // ─── Duplicate handling ──────────────────────────────────────────────────
 
   it('returns duplicate: true when an event with the same platform + messageId already exists', async () => {

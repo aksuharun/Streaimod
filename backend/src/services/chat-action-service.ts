@@ -3,7 +3,6 @@ import {
   type ChatActionType,
   type IChatActionDocument
 } from '../models/chat-action.js'
-import type { ChatPlatform } from '../models/chat-event.js'
 
 export interface ReserveChatActionInput {
   channelId: string

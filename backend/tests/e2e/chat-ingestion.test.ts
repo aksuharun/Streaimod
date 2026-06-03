@@ -511,6 +511,48 @@ describe('Chat Ingestion API', () => {
       expect(response.body.moderation.workflow).toBeDefined()
     })
 
+    it('returns 201 with self-message skips for Q&A and moderation', async () => {
+      const { app, qnaModelDecide, banDecide, timeoutDecide } =
+        createChatIngestionTestApp()
+
+      const response = await request(app)
+        .post('/api/chat/ingest')
+        .send({
+          channelId: uniqueTestId('ch'),
+          messageId: uniqueTestId('msg'),
+          authorExternalId: 'channel-owner-1',
+          channelExternalId: 'channel-owner-1',
+          platform: 'youtube',
+          sentAt: new Date().toISOString(),
+          text: '!discord'
+        })
+        .expect(201)
+
+      expect(response.body.duplicate).toBe(false)
+      expect(response.body.qna).toMatchObject({
+        agent: 'qna',
+        matched: false,
+        action: 'DO_NOTHING',
+        workflow: {
+          reason: 'SELF_MESSAGE_SKIPPED'
+        }
+      })
+      expect(response.body.moderation).toMatchObject({
+        agent: 'evo-moderation',
+        action: 'IGNORE',
+        reason: 'SELF_MESSAGE_SKIPPED',
+        stage: 'timeout',
+        workflow: {
+          banSkipped: true,
+          timeoutSkipped: true,
+          timeoutReason: 'SELF_MESSAGE_SKIPPED'
+        }
+      })
+      expect(qnaModelDecide).not.toHaveBeenCalled()
+      expect(banDecide).not.toHaveBeenCalled()
+      expect(timeoutDecide).not.toHaveBeenCalled()
+    })
+
     it('includes matched command details when the message matches a stored trigger', async () => {
       const app = createTestApp()
       const channelId = uniqueTestId('ch')

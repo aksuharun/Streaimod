@@ -354,6 +354,143 @@ describe('createYoutubeProducerRuntime', () => {
     )
   })
 
+  it('allows streamer self-messages to reach commands', async () => {
+    const listener = createMockYoutubeListener()
+    const youtube = createMockYoutubeClient(listener)
+    const fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify(
+          createIngestResponse({
+            command: {
+              matched: true,
+              replyText: 'Use !discord for the server link',
+              command: { id: 'command-1', trigger: '!discord' }
+            },
+            qna: {
+              agent: 'qna',
+              matched: false,
+              action: 'DO_NOTHING'
+            },
+            moderation: {
+              agent: 'evo-moderation',
+              action: 'IGNORE',
+              reason: 'SELF_MESSAGE_SKIPPED'
+            }
+          })
+        ),
+        { status: 201 }
+      )
+    )
+
+    const runtime = createYoutubeProducerRuntime(
+      {
+        channelId: 'channel-1',
+        liveVideoId: 'video-1',
+        ingestUrl: 'http://127.0.0.1:3000/api/chat/ingest',
+        accessToken: 'youtube-access-token'
+      },
+      {
+        createYoutubeClient: vi.fn(() => youtube),
+        fetch,
+        logger: createLogger().logger
+      }
+    )
+
+    await runtime.start()
+    await listener.handlers.message[0]?.(
+      createYoutubeMessage({
+        author: {
+          id: 'channel-external-1',
+          username: 'streamer',
+          displayName: 'Streamer'
+        }
+      })
+    )
+
+    const [, requestInit] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+
+    expect(JSON.parse(requestInit.body as string)).toMatchObject({
+      authorExternalId: 'channel-external-1',
+      channelExternalId: 'channel-external-1'
+    })
+    expect(JSON.parse(requestInit.body as string)).not.toHaveProperty('skipQna')
+    expect(JSON.parse(requestInit.body as string)).not.toHaveProperty('skipModeration')
+    expect(youtube.chat.sendMessage).toHaveBeenCalledWith({
+      liveChatId: 'live-chat-1',
+      text: 'Use !discord for the server link'
+    })
+  })
+
+  it('ignores echoed self-messages for recently sent command replies', async () => {
+    const listener = createMockYoutubeListener()
+    const youtube = createMockYoutubeClient(listener)
+    const fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify(
+          createIngestResponse({
+            command: {
+              matched: true,
+              replyText: 'Use !discord for the server link',
+              command: { id: 'command-1', trigger: '!discord' }
+            }
+          })
+        ),
+        { status: 201 }
+      )
+    )
+    const { logger, info } = createLogger()
+
+    const runtime = createYoutubeProducerRuntime(
+      {
+        channelId: 'channel-1',
+        liveVideoId: 'video-1',
+        ingestUrl: 'http://127.0.0.1:3000/api/chat/ingest',
+        accessToken: 'youtube-access-token'
+      },
+      {
+        createYoutubeClient: vi.fn(() => youtube),
+        fetch,
+        logger
+      }
+    )
+
+    await runtime.start()
+
+    await listener.handlers.message[0]?.(
+      createYoutubeMessage({
+        id: 'msg-viewer-1',
+        text: '!discord',
+        author: {
+          id: 'viewer-1',
+          username: 'viewer',
+          displayName: 'Viewer'
+        }
+      })
+    )
+
+    await listener.handlers.message[0]?.(
+      createYoutubeMessage({
+        id: 'msg-self-echo-1',
+        text: 'Use !discord for the server link',
+        author: {
+          id: 'channel-external-1',
+          username: 'streamer',
+          displayName: 'Streamer'
+        }
+      })
+    )
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(youtube.chat.sendMessage).toHaveBeenCalledTimes(1)
+    expect(info).toHaveBeenCalledWith(
+      'Skipping echoed YouTube self-message from producer action',
+      expect.objectContaining({
+        messageId: 'msg-self-echo-1',
+        liveChatId: 'live-chat-1'
+      })
+    )
+  })
+
   it('stops the active listener during shutdown', async () => {
     const listener = createMockYoutubeListener()
     const { logger } = createLogger()

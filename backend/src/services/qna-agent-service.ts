@@ -14,6 +14,7 @@ export type QnaAgentReason =
   | 'INVALID_AGENT_SELECTION'
   | 'AGENT_DISABLED'
   | 'HISTORY_SKIPPED'
+  | 'SELF_MESSAGE_SKIPPED'
 
 export interface RunQnaAgentInput {
   channelId: string

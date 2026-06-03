@@ -112,6 +112,7 @@ const defaultLogger: YoutubeProducerLogger = {
 
 const DEFAULT_TIMEOUT_DURATION_SECONDS = 15
 const MAX_LISTENER_AUTH_RECOVERY_ATTEMPTS = 1
+const OUTGOING_REPLY_ECHO_WINDOW_MS = 15_000
 
 function isNonEmptyString(value: string | null | undefined): value is string {
   return typeof value === 'string' && value.trim().length > 0
@@ -309,6 +310,8 @@ async function handleYoutubeMessage(
   liveChatId: string,
   getChatClient: () => Promise<YoutubeChatClient>,
   actionsEnabled: boolean,
+  isRecentOutgoingReplyText: (text: string) => boolean,
+  rememberOutgoingReplyText: (text: string) => void,
   skipQna: boolean = false
 ): Promise<void> {
   if (!isNonEmptyString(message.author.id)) {
@@ -335,8 +338,15 @@ async function handleYoutubeMessage(
 
   const authorId = message.author.id
   const channelExternalId = message.channel.id
+  const isSelfMessage = authorId === channelExternalId
 
-  if (authorId === channelExternalId) {
+  if (isSelfMessage && isRecentOutgoingReplyText(message.text)) {
+    dependencies.logger.info('Skipping echoed YouTube self-message from producer action', {
+      messageId: message.id,
+      liveChatId,
+      liveVideoId: config.liveVideoId,
+      textPreview: truncateForLog(message.text)
+    })
     return
   }
 
@@ -363,7 +373,8 @@ async function handleYoutubeMessage(
     authorId,
     getChatClient,
     actionsEnabled,
-    logger: dependencies.logger
+    logger: dependencies.logger,
+    rememberOutgoingReplyText
   })
 }
 
@@ -396,7 +407,8 @@ async function executeIngestActions({
   authorId,
   getChatClient,
   actionsEnabled,
-  logger
+  logger,
+  rememberOutgoingReplyText
 }: {
   ingestResult: ChatIngestResponse | null
   message: YoutubeChatMessage
@@ -406,6 +418,7 @@ async function executeIngestActions({
   getChatClient: () => Promise<YoutubeChatClient>
   actionsEnabled: boolean
   logger: YoutubeProducerLogger
+  rememberOutgoingReplyText: (text: string) => void
 }): Promise<void> {
   if (!ingestResult || ingestResult.duplicate) {
     return
@@ -562,7 +575,7 @@ async function executeIngestActions({
   }
 
   if (commandReplyText !== null) {
-    await executeReservedAction(
+    const actionResult = await executeReservedAction(
       {
         ...baseActionInput,
         type: 'command_reply',
@@ -581,6 +594,9 @@ async function executeIngestActions({
         }),
       logger
     )
+    if (actionResult.executed) {
+      rememberOutgoingReplyText(commandReplyText)
+    }
     return
   }
 
@@ -607,6 +623,7 @@ async function executeIngestActions({
     )
 
     if (actionResult.executed) {
+      rememberOutgoingReplyText(replyText)
       logger.info('Q&A response sent', {
         messageId: message.id,
         liveChatId,
@@ -636,6 +653,30 @@ export function createYoutubeProducerRuntime(
   let stopped = true
   let authRecoveryAttempts = 0
   let authRecoveryInProgress = false
+  const recentOutgoingReplies: Array<{ text: string; createdAt: number }> = []
+
+  const pruneRecentOutgoingReplies = (now: number = Date.now()): void => {
+    while (
+      recentOutgoingReplies.length > 0 &&
+      now - recentOutgoingReplies[0]!.createdAt > OUTGOING_REPLY_ECHO_WINDOW_MS
+    ) {
+      recentOutgoingReplies.shift()
+    }
+  }
+
+  const isRecentOutgoingReplyText = (text: string): boolean => {
+    const now = Date.now()
+    pruneRecentOutgoingReplies(now)
+    return recentOutgoingReplies.some(
+      (entry) => entry.text === text && now - entry.createdAt <= OUTGOING_REPLY_ECHO_WINDOW_MS
+    )
+  }
+
+  const rememberOutgoingReplyText = (text: string): void => {
+    const now = Date.now()
+    pruneRecentOutgoingReplies(now)
+    recentOutgoingReplies.push({ text, createdAt: now })
+  }
 
   const resolveRuntimeAccessToken = async (): Promise<string> => {
     const accessToken = config.accessToken ?? (await config.getAccessToken?.())
@@ -699,7 +740,9 @@ export function createYoutubeProducerRuntime(
               dependencies,
               liveChatId,
               getActionChatClient,
-              true
+              true,
+              isRecentOutgoingReplyText,
+              rememberOutgoingReplyText
             )
           } catch (error) {
             dependencies.logger.error(
@@ -861,6 +904,8 @@ export function createYoutubeProducerRuntime(
                   liveChatId,
                   getActionChatClient,
                   true,
+                  isRecentOutgoingReplyText,
+                  rememberOutgoingReplyText,
                   true
                 )
               } catch (error) {

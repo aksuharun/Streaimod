@@ -6,10 +6,12 @@ import {
 } from '../models/chat-event.js'
 import {
   runQnaAgentWorkflow,
+  type QnaAgentReason,
   type QnaAgentResult,
   type RunQnaAgentInput
 } from './qna-agent-service.js'
 import {
+  countUnicodeChars,
   runEvoModerationWorkflow,
   type EvoModerationResult,
   type RunEvoModerationInput
@@ -156,6 +158,56 @@ function normalizeInput(input: ChatIngestionInput) {
   }
 }
 
+function createSkippedQnaResult(
+  message: string,
+  reason: Extract<QnaAgentReason, 'HISTORY_SKIPPED' | 'SELF_MESSAGE_SKIPPED'>
+): QnaAgentResult {
+  return {
+    agent: 'qna',
+    matched: false,
+    action: 'DO_NOTHING',
+    workflow: {
+      receivedMessage: true,
+      retrievedEntries: 0,
+      retrievedQnaEntries: [],
+      normalizedMessage: normalizeQuestionText(message),
+      promptRendered: false,
+      decision: 'DO_NOTHING',
+      reason
+    }
+  }
+}
+
+function createSkippedModerationResult(message: string): EvoModerationResult {
+  const unicodeCount = countUnicodeChars(message)
+
+  return {
+    agent: 'evo-moderation',
+    action: 'IGNORE',
+    catalogId: null,
+    reason: 'SELF_MESSAGE_SKIPPED',
+    stage: 'timeout',
+    workflow: {
+      receivedMessage: true,
+      unicodeCount,
+      normalized: false,
+      normalizedMessage: message,
+      banCategoryIds: [],
+      timeoutCategoryIds: [],
+      banCategoriesCount: 0,
+      timeoutCategoriesCount: 0,
+      banSkipped: true,
+      timeoutSkipped: true,
+      banAction: null,
+      banCatalogId: null,
+      banReason: 'SELF_MESSAGE_SKIPPED',
+      timeoutAction: 'IGNORE',
+      timeoutCatalogId: null,
+      timeoutReason: 'SELF_MESSAGE_SKIPPED'
+    }
+  }
+}
+
 function isDuplicateKeyError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) {
     return false
@@ -180,6 +232,8 @@ export async function ingestChat(
   dependencies: ChatIngestionDependencies = getDefaultDependencies()
 ): Promise<ChatIngestionResult> {
   const normalized = normalizeInput(input)
+  const isSelfMessage =
+    normalized.authorExternalId === normalized.channelExternalId
 
   let event: IChatEventDocument
 
@@ -222,32 +276,25 @@ export async function ingestChat(
       messageText: normalized.text
     })
 
-    const qnaPromise: Promise<QnaAgentResult> = normalized.skipQna
-      ? Promise.resolve({
-          agent: 'qna',
-          matched: false,
-          action: 'DO_NOTHING',
-          workflow: {
-            receivedMessage: true,
-            retrievedEntries: 0,
-            retrievedQnaEntries: [],
-            normalizedMessage: normalizeQuestionText(normalized.text),
-            promptRendered: false,
-            decision: 'DO_NOTHING',
-            reason: 'HISTORY_SKIPPED'
-          }
-        })
-      : dependencies.runQnaAgentWorkflow({
+    const qnaPromise: Promise<QnaAgentResult> = isSelfMessage
+      ? Promise.resolve(createSkippedQnaResult(normalized.text, 'SELF_MESSAGE_SKIPPED'))
+      : normalized.skipQna
+        ? Promise.resolve(createSkippedQnaResult(normalized.text, 'HISTORY_SKIPPED'))
+        : dependencies.runQnaAgentWorkflow({
+            channelId: normalized.channelId,
+            messageText: normalized.text
+          })
+
+    const moderationPromise: Promise<EvoModerationResult> = isSelfMessage
+      ? Promise.resolve(createSkippedModerationResult(normalized.text))
+      : dependencies.runEvoModerationWorkflow({
           channelId: normalized.channelId,
-          messageText: normalized.text
+          message: normalized.text
         })
 
     const [qnaResult, moderationResult] = await Promise.all([
       qnaPromise,
-      dependencies.runEvoModerationWorkflow({
-        channelId: normalized.channelId,
-        message: normalized.text
-      })
+      moderationPromise
     ])
 
     return {
