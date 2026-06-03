@@ -49,9 +49,9 @@ const ownedChannelSchema = new Schema<IYoutubeOwnedChannel>(
     name: { type: String, required: true },
     handle: { type: String, default: null },
     thumbnail: { type: String, default: null },
-    qnaEnabled: { type: Boolean, default: true },
-    commandsEnabled: { type: Boolean, default: true },
-    moderationEnabled: { type: Boolean, default: true }
+    qnaEnabled: { type: Boolean, default: false },
+    commandsEnabled: { type: Boolean, default: false },
+    moderationEnabled: { type: Boolean, default: false }
   },
   { _id: false }
 )

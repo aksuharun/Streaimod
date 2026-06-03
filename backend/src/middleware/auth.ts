@@ -30,9 +30,9 @@ export const requireAuthenticatedUser: RequestHandler = async (
               name: 'Test Channel',
               handle: null,
               thumbnail: null,
-              qnaEnabled: true,
-              commandsEnabled: true,
-              moderationEnabled: true
+              qnaEnabled: false,
+              commandsEnabled: false,
+              moderationEnabled: false
             }
         ],
         activeChannelId: '*',

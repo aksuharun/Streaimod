@@ -123,9 +123,9 @@ function mapIdentityToOwnedChannel(
     name: identity.displayName ?? identity.channelId,
     handle: identity.handle || null,
     thumbnail: identity.profilePictureUrl ?? null,
-    qnaEnabled: true,
-    commandsEnabled: true,
-    moderationEnabled: true
+    qnaEnabled: false,
+    commandsEnabled: false,
+    moderationEnabled: false
   }
 }
 
@@ -135,9 +135,9 @@ function cloneOwnedChannel(channel: IYoutubeOwnedChannel): IYoutubeOwnedChannel 
     name: channel.name,
     handle: channel.handle ?? null,
     thumbnail: channel.thumbnail ?? null,
-    qnaEnabled: channel.qnaEnabled ?? true,
-    commandsEnabled: channel.commandsEnabled ?? true,
-    moderationEnabled: channel.moderationEnabled ?? true
+    qnaEnabled: channel.qnaEnabled ?? false,
+    commandsEnabled: channel.commandsEnabled ?? false,
+    moderationEnabled: channel.moderationEnabled ?? false
   }
 }
 
@@ -156,7 +156,7 @@ export function isChannelQnaEnabled(
     return true
   }
 
-  return getOwnedChannel(user, channelId)?.qnaEnabled ?? true
+  return getOwnedChannel(user, channelId)?.qnaEnabled ?? false
 }
 
 export function isChannelCommandsEnabled(
@@ -167,7 +167,7 @@ export function isChannelCommandsEnabled(
     return true
   }
 
-  return getOwnedChannel(user, channelId)?.commandsEnabled ?? true
+  return getOwnedChannel(user, channelId)?.commandsEnabled ?? false
 }
 
 export function isChannelModerationEnabled(
@@ -178,7 +178,7 @@ export function isChannelModerationEnabled(
     return true
   }
 
-  return getOwnedChannel(user, channelId)?.moderationEnabled ?? true
+  return getOwnedChannel(user, channelId)?.moderationEnabled ?? false
 }
 
 function shouldFetchOwnedYoutubeChannels(user: IUserDocument | null): boolean {
@@ -264,9 +264,9 @@ function mergeOwnedYoutubeChannels(
 
     return {
       ...channel,
-      qnaEnabled: existingChannel.qnaEnabled ?? true,
-      commandsEnabled: existingChannel.commandsEnabled ?? true,
-      moderationEnabled: existingChannel.moderationEnabled ?? true
+      qnaEnabled: existingChannel.qnaEnabled ?? false,
+      commandsEnabled: existingChannel.commandsEnabled ?? false,
+      moderationEnabled: existingChannel.moderationEnabled ?? false
     }
   })
 }
@@ -437,9 +437,9 @@ export function toAuthSessionDto(user: IUserDocument): AuthSessionDto {
         name: channel.name,
         handle: channel.handle,
         thumbnail: channel.thumbnail,
-        qnaEnabled: channel.qnaEnabled ?? true,
-        commandsEnabled: channel.commandsEnabled ?? true,
-        moderationEnabled: channel.moderationEnabled ?? true
+        qnaEnabled: channel.qnaEnabled ?? false,
+        commandsEnabled: channel.commandsEnabled ?? false,
+        moderationEnabled: channel.moderationEnabled ?? false
       })),
       activeChannelId: user.activeChannelId
     }
