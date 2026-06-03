@@ -334,6 +334,7 @@ function StatusSwitch(props: {
 }
 
 function Modal(props: {
+  eyebrow?: string
   title: string
   description: string
   children: ReactNode
@@ -357,7 +358,7 @@ function Modal(props: {
       <div className={`modal-card ${props.wide ? 'modal-card-wide' : ''}`}>
         <div className="modal-header">
           <div>
-            <p className="eyebrow">Editor</p>
+            <p className="eyebrow">{props.eyebrow ?? 'Editor'}</p>
             <h2>{props.title}</h2>
             <p>{props.description}</p>
           </div>
@@ -2175,7 +2176,7 @@ function ModerationPage(props: {
   const [dragOverColumn, setDragOverColumn] = useState<BoardColumn | ''>('')
   const [movingIds, setMovingIds] = useState<Record<string, boolean>>({})
   const [togglingIds, setTogglingIds] = useState<Record<string, boolean>>({})
-  const [agentToggleIntent, setAgentToggleIntent] = useState<'enable' | 'disable' | null>(null)
+  const [consentModalOpen, setConsentModalOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -2230,8 +2231,25 @@ function ModerationPage(props: {
   const hasEnabledAgentCategory = categories.some((category) => category.enabled)
   const moderationEnableBlocked =
     !props.activeChannel.moderationEnabled && !loading && !error && !hasEnabledAgentCategory
-  const showingExperimentalEnableWarning =
-    agentToggleIntent === 'enable' && props.channelSettingsUpdating
+
+  async function applyAgentToggle(enablingAgent: boolean) {
+    try {
+      await props.onUpdateChannelSettings({
+        moderationEnabled: enablingAgent
+      })
+      showSuccessToast({
+        title: enablingAgent ? 'Moderation agent enabled' : 'Moderation agent paused',
+        description: enablingAgent
+          ? 'Timeout and ban workflows will evaluate incoming live chat again.'
+          : 'Assigned categories stay saved, but runtime enforcement is paused.'
+      })
+    } catch (toggleError) {
+      showErrorToast({
+        title: 'Agent update failed',
+        description: toggleError instanceof Error ? toggleError.message : 'Failed to update the moderation agent setting.'
+      })
+    }
+  }
 
   async function moveCard(catalogId: string, targetColumn: BoardColumn) {
     if (!catalogId || movingIds[catalogId]) return
@@ -2341,26 +2359,17 @@ function ModerationPage(props: {
     }
 
     const enablingAgent = !props.activeChannel.moderationEnabled
-    setAgentToggleIntent(enablingAgent ? 'enable' : 'disable')
-
-    try {
-      await props.onUpdateChannelSettings({
-        moderationEnabled: enablingAgent
-      })
-      showSuccessToast({
-        title: enablingAgent ? 'Moderation agent enabled' : 'Moderation agent paused',
-        description: enablingAgent
-          ? 'Timeout and ban workflows will evaluate incoming live chat again.'
-          : 'Assigned categories stay saved, but runtime enforcement is paused.'
-      })
-    } catch (toggleError) {
-      showErrorToast({
-        title: 'Agent update failed',
-        description: toggleError instanceof Error ? toggleError.message : 'Failed to update the moderation agent setting.'
-      })
-    } finally {
-      setAgentToggleIntent(null)
+    if (enablingAgent) {
+      setConsentModalOpen(true)
+      return
     }
+
+    await applyAgentToggle(false)
+  }
+
+  async function confirmEnableAgent() {
+    setConsentModalOpen(false)
+    await applyAgentToggle(true)
   }
 
   function renderLane(column: BoardColumn, title: string, description: string, items: typeof boardItems) {
@@ -2478,11 +2487,9 @@ function ModerationPage(props: {
               ? 'The moderation workflow is active and can issue timeout or ban decisions from assigned categories.'
               : 'The moderation workflow is paused. Your board stays saved, but runtime enforcement is disabled.'}
           </p>
-          {showingExperimentalEnableWarning && (
-            <p className="experimental-warning">
-              Experimental feature: enabling moderation can take a moment and may not succeed on the first attempt.
-            </p>
-          )}
+          <p className="experimental-warning">
+            Experimental feature: moderation can misfire, take a moment to enable, or fail on the first attempt.
+          </p>
           {moderationEnableBlocked && (
             <p>Enable at least one assigned moderation category before turning this workflow on.</p>
           )}
@@ -2531,6 +2538,45 @@ function ModerationPage(props: {
           {renderLane('timeout', 'Timeout Agent', 'Temporary enforcement for spam, escalation control, and lower-severity disruption.', timeoutLane)}
           {renderLane('ban', 'Ban Agent', 'Permanent enforcement for severe abuse, threats, scams, or malicious behavior.', banLane)}
         </section>
+      )}
+
+      {consentModalOpen && (
+        <Modal
+          eyebrow="Experimental feature"
+          title="Enable moderation agent"
+          description="Confirm that you understand the moderation agent is still experimental before turning it on."
+          onClose={() => {
+            if (!props.channelSettingsUpdating) setConsentModalOpen(false)
+          }}
+        >
+          <div className="consent-flow">
+            <p className="experimental-warning">
+              Experimental feature: moderation can misfire, take a moment to enable, or fail on the first attempt.
+            </p>
+            <ul className="consent-list">
+              <li>Timeout and ban actions can behave inconsistently while this agent is active.</li>
+              <li>Review assigned categories before enabling the workflow on a live channel.</li>
+            </ul>
+            <div className="editor-actions">
+              <button
+                type="button"
+                className="ghost-button"
+                disabled={props.channelSettingsUpdating}
+                onClick={() => setConsentModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                disabled={props.channelSettingsUpdating}
+                onClick={() => void confirmEnableAgent()}
+              >
+                {props.channelSettingsUpdating ? 'Enabling...' : 'Enable anyway'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   )
