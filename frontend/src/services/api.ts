@@ -11,6 +11,23 @@ export interface QnaEntry {
   updatedAt?: string
 }
 
+export interface QnaBulkImportPayload {
+  version: number
+  entries: Array<{
+    question: string
+    answer: string
+    enabled?: boolean
+  }>
+}
+
+export interface QnaBulkImportResponse {
+  createdCount: number
+  updatedCount: number
+  unchangedCount: number
+  totalCount: number
+  entries: QnaEntry[]
+}
+
 export interface ChatCommand {
   id: string
   channelId: string
@@ -202,6 +219,19 @@ class ApiClient {
   async deleteQnaEntry(id: string): Promise<void> {
     return this.request<void>(`/api/qna/${encodeURIComponent(id)}`, {
       method: 'DELETE',
+    })
+  }
+
+  async importQnaEntries(
+    channelId: string,
+    data: QnaBulkImportPayload
+  ): Promise<QnaBulkImportResponse> {
+    return this.request<QnaBulkImportResponse>('/api/qna/bulk-import', {
+      method: 'POST',
+      body: JSON.stringify({
+        channelId,
+        ...data,
+      }),
     })
   }
 

@@ -4,6 +4,7 @@ import {
   useEffect,
   useState,
   useSyncExternalStore,
+  type ChangeEvent,
   type DragEvent,
   type FormEvent,
   type ReactNode
@@ -27,6 +28,7 @@ import {
   type ChatCommand,
   type ModerationCategory,
   type ModerationCategoryType,
+  type QnaBulkImportPayload,
   type QnaEntry,
   type StreamSummary
 } from './services/api'
@@ -57,6 +59,50 @@ interface CommandDraft {
   replyText: string
   enabled: boolean
 }
+
+const qnaBulkImportExample = JSON.stringify(
+  {
+    version: 1,
+    entries: [
+      {
+        question: 'What is the streaming schedule?',
+        answer: 'Every weekday at 3 PM EST.'
+      }
+    ]
+  },
+  null,
+  2
+)
+
+const qnaBulkImportPrompt = [
+  'Create a valid JSON object for bulk importing Q&A items into my streaming automation tool.',
+  'I will attach or paste a stream transcript, FAQ, notes, or other source documents after this prompt.',
+  '',
+  'Return exactly one JSON object and nothing else.',
+  'Use this schema exactly:',
+  '{',
+  '  "version": 1,',
+  '  "entries": [',
+  '    {',
+  '      "question": "string",',
+  '      "answer": "string",',
+  '      "enabled": true',
+  '    }',
+  '  ]',
+  '}',
+  '',
+  'Rules:',
+  '- version must be 1.',
+  '- entries must be an array.',
+  '- Each entry must include question and answer.',
+  '- enabled is optional; include it only when you need to disable an item.',
+  '- Do not include channelId, id, normalizedQuestion, createdAt, or updatedAt.',
+  '- Avoid duplicate questions that mean the same thing.',
+  '- Keep answers concise and streamer-safe.',
+  '- Return plain JSON, not Markdown.'
+].join('\n')
+
+const qnaBulkImportChatGptUrl = `https://chatgpt.com/?prompt=${encodeURIComponent(qnaBulkImportPrompt)}`
 
 type ChannelFeatureToggle = 'qnaEnabled' | 'commandsEnabled' | 'moderationEnabled'
 
@@ -221,6 +267,10 @@ function toneClass(tone: ToastItem['tone']) {
   if (tone === 'error') return 'toast-error'
   if (tone === 'loading') return 'toast-loading'
   return 'toast-info'
+}
+
+async function copyTextToClipboard(value: string) {
+  await navigator.clipboard.writeText(value)
 }
 
 function isProtectedRoute(path: string) {
@@ -1074,6 +1124,24 @@ function QnaPage(props: {
   const [saving, setSaving] = useState(false)
   const [togglingIds, setTogglingIds] = useState<Record<string, boolean>>({})
   const [deletingIds, setDeletingIds] = useState<Record<string, boolean>>({})
+  const [bulkModalOpen, setBulkModalOpen] = useState(false)
+  const [bulkJsonText, setBulkJsonText] = useState('')
+  const [bulkFileName, setBulkFileName] = useState<string | null>(null)
+  const [bulkImporting, setBulkImporting] = useState(false)
+
+  async function reloadEntries() {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await api.getQnaEntries(props.activeChannel.channelId)
+      setEntries(result)
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load Q&A entries')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -1131,6 +1199,52 @@ function QnaPage(props: {
     setModalOpen(true)
   }
 
+  function openBulkModal() {
+    setBulkJsonText('')
+    setBulkFileName(null)
+    setBulkModalOpen(true)
+  }
+
+  async function loadBulkImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    try {
+      const contents = await file.text()
+      setBulkJsonText(contents)
+      setBulkFileName(file.name)
+      showSuccessToast({
+        title: 'File loaded',
+        description: `"${file.name}" is ready to import.`
+      })
+    } catch {
+      showErrorToast({
+        title: 'File read failed',
+        description: 'The selected JSON file could not be read.'
+      })
+    } finally {
+      event.target.value = ''
+    }
+  }
+
+  async function copyBulkImportPrompt() {
+    try {
+      await copyTextToClipboard(qnaBulkImportPrompt)
+      showSuccessToast({
+        title: 'Prompt copied',
+        description: 'Paste it into ChatGPT and attach your transcript or notes there.'
+      })
+    } catch {
+      showErrorToast({
+        title: 'Copy failed',
+        description: 'Clipboard access is unavailable in this browser.'
+      })
+    }
+  }
+
   async function submitRule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -1180,6 +1294,64 @@ function QnaPage(props: {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function submitBulkImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const trimmed = bulkJsonText.trim()
+
+    if (!trimmed) {
+      showErrorToast({
+        title: 'Validation error',
+        description: 'Paste a JSON object or load a .json file before importing.'
+      })
+      return
+    }
+
+    let payload: QnaBulkImportPayload
+
+    try {
+      const parsed = JSON.parse(trimmed) as unknown
+
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        showErrorToast({
+          title: 'Invalid JSON',
+          description: 'The bulk editor expects a single JSON object at the top level.'
+        })
+        return
+      }
+
+      payload = parsed as QnaBulkImportPayload
+    } catch {
+      showErrorToast({
+        title: 'Invalid JSON',
+        description: 'The bulk editor only accepts a valid JSON object.'
+      })
+      return
+    }
+
+    setBulkImporting(true)
+
+    try {
+      const result = await api.importQnaEntries(props.activeChannel.channelId, payload)
+      const refreshedEntries = await api.getQnaEntries(props.activeChannel.channelId)
+      setEntries(refreshedEntries)
+      setBulkModalOpen(false)
+      setBulkJsonText('')
+      setBulkFileName(null)
+      showSuccessToast({
+        title: 'Bulk edit complete',
+        description: `${result.totalCount} item${result.totalCount === 1 ? '' : 's'} processed: ${result.createdCount} created, ${result.updatedCount} updated, ${result.unchangedCount} unchanged.`
+      })
+    } catch (importError) {
+      showErrorToast({
+        title: 'Bulk edit failed',
+        description: importError instanceof Error ? importError.message : 'Failed to import Q&A items.'
+      })
+    } finally {
+      setBulkImporting(false)
     }
   }
 
@@ -1254,9 +1426,14 @@ function QnaPage(props: {
             Store exact replies for repeated questions. The agent only answers on saved matches.
           </p>
         </div>
-        <button type="button" className="primary-button" onClick={openCreateModal}>
-          Add response rule
-        </button>
+        <div className="page-header-actions">
+          <button type="button" className="ghost-button" onClick={openBulkModal}>
+            Bulk edit
+          </button>
+          <button type="button" className="primary-button" onClick={openCreateModal}>
+            Add response rule
+          </button>
+        </div>
       </header>
 
       <section className="panel agent-banner">
@@ -1284,18 +1461,7 @@ function QnaPage(props: {
           <button
             type="button"
             className="ghost-button"
-            onClick={async () => {
-              setLoading(true)
-              setError(null)
-              try {
-                const result = await api.getQnaEntries(props.activeChannel.channelId)
-                setEntries(result)
-              } catch (loadError) {
-                setError(loadError instanceof Error ? loadError.message : 'Failed to load Q&A entries')
-              } finally {
-                setLoading(false)
-              }
-            }}
+            onClick={() => void reloadEntries()}
           >
             Retry
           </button>
@@ -1435,6 +1601,105 @@ function QnaPage(props: {
               </button>
               <button type="submit" className="primary-button" disabled={saving}>
                 {saving ? 'Saving...' : editingEntry ? 'Save changes' : 'Create rule'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {bulkModalOpen && (
+        <Modal
+          title="Bulk edit Q&A rules"
+          description="Paste a valid import object or load a JSON file. Matching questions update in place by normalized question."
+          onClose={() => {
+            if (!bulkImporting) setBulkModalOpen(false)
+          }}
+        >
+          <form className="editor-form bulk-editor-form" onSubmit={(event) => void submitBulkImport(event)}>
+            <section className="bulk-help-grid">
+              <article className="panel bulk-help-card">
+                <p className="eyebrow">Accepted schema</p>
+                <h3>What to import</h3>
+                <ul className="bulk-help-list">
+                  <li>The top-level object must contain `version` and `entries`.</li>
+                  <li>`version` must be `1`.</li>
+                  <li>Each entry must include `question` and `answer`.</li>
+                  <li>`enabled` is optional and defaults to `true`.</li>
+                  <li>Do not include `channelId`, `id`, or `normalizedQuestion`.</li>
+                </ul>
+              </article>
+
+              <article className="panel bulk-help-card bulk-help-card-accent">
+                <p className="eyebrow">Generate with ChatGPT</p>
+                <h3>Bring your transcript or docs</h3>
+                <p>
+                  Open ChatGPT with a starter prompt, then attach your stream transcript, FAQ, or notes and ask it to return valid import JSON.
+                </p>
+                <div className="bulk-link-row">
+                  <a
+                    href={qnaBulkImportChatGptUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ghost-button external-link-button"
+                  >
+                    <ArrowUpRight size={16} strokeWidth={2} />
+                    Open ChatGPT
+                  </a>
+                  <button type="button" className="ghost-button" onClick={() => void copyBulkImportPrompt()}>
+                    Copy prompt
+                  </button>
+                </div>
+              </article>
+            </section>
+
+            <label>
+              <span>Paste the import object</span>
+              <textarea
+                rows={14}
+                className="bulk-json-textarea"
+                value={bulkJsonText}
+                onChange={(event) => setBulkJsonText(event.target.value)}
+                placeholder={qnaBulkImportExample}
+                spellCheck={false}
+              />
+            </label>
+
+            <div className="bulk-upload-card">
+              <div className="bulk-input-header">
+                <div>
+                  <strong>Upload a JSON file</strong>
+                  <p>
+                    Load a `.json` file instead of pasting. The file contents will appear in the editor above.
+                  </p>
+                </div>
+                {bulkFileName && <span className="bulk-file-pill">{bulkFileName}</span>}
+              </div>
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={(event) => void loadBulkImportFile(event)}
+              />
+            </div>
+
+            <div className="bulk-example-card">
+              <div className="bulk-input-header">
+                <div>
+                  <strong>Example object</strong>
+                  <p>Use this as a template if you are creating the JSON manually.</p>
+                </div>
+                <button type="button" className="ghost-button" onClick={() => setBulkJsonText(qnaBulkImportExample)}>
+                  Use example
+                </button>
+              </div>
+              <pre className="code-block">{qnaBulkImportExample}</pre>
+            </div>
+
+            <div className="editor-actions">
+              <button type="button" className="ghost-button" disabled={bulkImporting} onClick={() => setBulkModalOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="primary-button" disabled={bulkImporting}>
+                {bulkImporting ? 'Importing...' : 'Apply bulk edit'}
               </button>
             </div>
           </form>

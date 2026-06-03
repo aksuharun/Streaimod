@@ -47,11 +47,17 @@ function isDuplicateKeyError(error: unknown): boolean {
 }
 
 export class QnaServiceError extends Error {
-  public readonly code: 'NORMALIZED_EMPTY' | 'DUPLICATE_QUESTION'
+  public readonly code:
+    | 'NORMALIZED_EMPTY'
+    | 'DUPLICATE_QUESTION'
+    | 'DUPLICATE_IMPORT_QUESTION'
 
   constructor(
     message: string,
-    code: 'NORMALIZED_EMPTY' | 'DUPLICATE_QUESTION'
+    code:
+      | 'NORMALIZED_EMPTY'
+      | 'DUPLICATE_QUESTION'
+      | 'DUPLICATE_IMPORT_QUESTION'
   ) {
     super(message)
     this.name = 'QnaServiceError'
@@ -139,6 +145,20 @@ export interface UpdateEntryInput {
   enabled?: boolean
 }
 
+export interface BulkImportEntryInput {
+  question: string
+  answer: string
+  enabled?: boolean
+}
+
+export interface BulkImportResult {
+  createdCount: number
+  updatedCount: number
+  unchangedCount: number
+  totalCount: number
+  entries: IQnaEntryDocument[]
+}
+
 export async function updateEntry(
   id: string,
   input: UpdateEntryInput
@@ -218,4 +238,118 @@ export async function deleteEntry(id: string): Promise<boolean> {
   const result = await QnaEntry.findOneAndDelete({ _id: id }).exec()
 
   return result !== null
+}
+
+export async function importEntries(
+  channelId: string,
+  entries: BulkImportEntryInput[]
+): Promise<BulkImportResult> {
+  const trimmedChannelId = channelId.trim()
+  const normalizedEntries = entries.map((entry, index) => {
+    const trimmedQuestion = entry.question.trim()
+    const normalizedQuestion = normalizeQuestionText(trimmedQuestion)
+
+    if (normalizedQuestion.length === 0) {
+      throw new QnaServiceError(
+        `Entry ${index + 1} question resolves to an empty value after normalization`,
+        'NORMALIZED_EMPTY'
+      )
+    }
+
+    return {
+      question: trimmedQuestion,
+      normalizedQuestion,
+      answer: entry.answer.trim(),
+      enabled: entry.enabled ?? true
+    }
+  })
+
+  const payloadQuestionIndexes = new Map<string, number>()
+
+  for (const [index, entry] of normalizedEntries.entries()) {
+    const duplicateIndex = payloadQuestionIndexes.get(entry.normalizedQuestion)
+
+    if (duplicateIndex !== undefined) {
+      throw new QnaServiceError(
+        `Entries ${duplicateIndex + 1} and ${index + 1} resolve to the same normalized question`,
+        'DUPLICATE_IMPORT_QUESTION'
+      )
+    }
+
+    payloadQuestionIndexes.set(entry.normalizedQuestion, index)
+  }
+
+  const existingEntries = await QnaEntry.find({
+    channelId: trimmedChannelId,
+    normalizedQuestion: {
+      $in: normalizedEntries.map((entry) => entry.normalizedQuestion)
+    }
+  }).exec()
+
+  const existingByNormalized = new Map(
+    existingEntries.map((entry) => [entry.normalizedQuestion, entry] as const)
+  )
+
+  const savedEntries: IQnaEntryDocument[] = []
+  let createdCount = 0
+  let updatedCount = 0
+  let unchangedCount = 0
+
+  for (const entry of normalizedEntries) {
+    const existing = existingByNormalized.get(entry.normalizedQuestion)
+
+    if (!existing) {
+      const created = await QnaEntry.create({
+        channelId: trimmedChannelId,
+        question: entry.question,
+        normalizedQuestion: entry.normalizedQuestion,
+        answer: entry.answer,
+        enabled: entry.enabled
+      })
+
+      existingByNormalized.set(entry.normalizedQuestion, created)
+      savedEntries.push(created)
+      createdCount += 1
+      continue
+    }
+
+    const changed =
+      existing.question !== entry.question ||
+      existing.answer !== entry.answer ||
+      existing.enabled !== entry.enabled
+
+    if (!changed) {
+      savedEntries.push(existing)
+      unchangedCount += 1
+      continue
+    }
+
+    const updated = await QnaEntry.findOneAndUpdate(
+      { _id: existing._id },
+      {
+        $set: {
+          question: entry.question,
+          answer: entry.answer,
+          enabled: entry.enabled
+        }
+      },
+      { new: true }
+    ).exec()
+
+    if (!updated) {
+      throw new Error('Q&A entry disappeared during bulk import')
+    }
+
+    existingByNormalized.set(entry.normalizedQuestion, updated)
+    savedEntries.push(updated)
+    updatedCount += 1
+  }
+
+  return {
+    createdCount,
+    updatedCount,
+    unchangedCount,
+    totalCount: normalizedEntries.length,
+    entries: savedEntries
+  }
 }

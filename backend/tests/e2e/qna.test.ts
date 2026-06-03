@@ -291,6 +291,130 @@ describe('Q&A API', () => {
     })
   })
 
+  describe('POST /api/qna/bulk-import', () => {
+    it('creates and updates entries from a versioned payload', async () => {
+      const app = createTestApp()
+      const channelId = uniqueTestId('ch')
+
+      await request(app)
+        .post('/api/qna')
+        .send({
+          channelId,
+          question: 'What is the schedule?',
+          answer: 'Old answer',
+          enabled: true
+        })
+        .expect(201)
+
+      const response = await request(app)
+        .post('/api/qna/bulk-import')
+        .send({
+          channelId,
+          version: 1,
+          entries: [
+            {
+              question: 'WHAT IS THE SCHEDULE??',
+              answer: 'New answer',
+              enabled: false
+            },
+            {
+              question: 'Where is the Discord link?',
+              answer: 'In the description.'
+            }
+          ]
+        })
+        .expect(200)
+
+      expect(response.body).toMatchObject({
+        createdCount: 1,
+        updatedCount: 1,
+        unchangedCount: 0,
+        totalCount: 2
+      })
+      expect(response.body.entries).toHaveLength(2)
+
+      const listResponse = await request(app)
+        .get(`/api/qna?channelId=${encodeURIComponent(channelId)}`)
+        .expect(200)
+
+      expect(listResponse.body).toHaveLength(2)
+      expect(listResponse.body[0]).toMatchObject({
+        question: 'Where is the Discord link?',
+        answer: 'In the description.',
+        enabled: true
+      })
+      expect(listResponse.body[1]).toMatchObject({
+        question: 'WHAT IS THE SCHEDULE??',
+        answer: 'New answer',
+        enabled: false,
+        normalizedQuestion: 'what is the schedule'
+      })
+    })
+
+    it('returns 400 for duplicated normalized questions inside the payload', async () => {
+      const app = createTestApp()
+      const response = await request(app)
+        .post('/api/qna/bulk-import')
+        .send({
+          channelId: uniqueTestId('ch'),
+          version: 1,
+          entries: [
+            {
+              question: 'Yasin kaç?',
+              answer: '22'
+            },
+            {
+              question: 'Yasin kac?',
+              answer: '22'
+            }
+          ]
+        })
+        .expect(400)
+
+      expect(response.body.error).toMatch(/same normalized question/)
+    })
+
+    it('returns 400 when the payload contains unsupported top-level keys', async () => {
+      const app = createTestApp()
+      const response = await request(app)
+        .post('/api/qna/bulk-import')
+        .send({
+          channelId: uniqueTestId('ch'),
+          version: 1,
+          entries: [
+            {
+              question: 'What is the schedule?',
+              answer: 'Weekdays at 3 PM EST'
+            }
+          ],
+          replaceAll: true
+        })
+        .expect(400)
+
+      expect(response.body.error).toMatch(/Only channelId, version, and entries/)
+    })
+
+    it('returns 400 when an entry contains unsupported keys', async () => {
+      const app = createTestApp()
+      const response = await request(app)
+        .post('/api/qna/bulk-import')
+        .send({
+          channelId: uniqueTestId('ch'),
+          version: 1,
+          entries: [
+            {
+              question: 'What is the schedule?',
+              answer: 'Weekdays at 3 PM EST',
+              normalizedQuestion: 'what is the schedule'
+            }
+          ]
+        })
+        .expect(400)
+
+      expect(response.body.error).toMatch(/may only include question, answer, and enabled/)
+    })
+  })
+
   // ─── GET /api/qna/:id (single) ───────────────────────────────────
 
   describe('GET /api/qna/:id', () => {

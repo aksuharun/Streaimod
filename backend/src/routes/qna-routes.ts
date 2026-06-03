@@ -15,6 +15,7 @@ import {
   createEntry,
   deleteEntry,
   getEntry,
+  importEntries,
   listEntries,
   QnaServiceError,
   updateEntry
@@ -55,6 +56,13 @@ function toEntryDto(doc: IQnaEntryDocument) {
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt
   }
+}
+
+function hasOnlyKeys(
+  value: Record<string, unknown>,
+  allowedKeys: string[]
+): boolean {
+  return Object.keys(value).every((key) => allowedKeys.includes(key))
 }
 
 router.post('/', async (request_, response, next) => {
@@ -139,6 +147,112 @@ router.get('/:id', async (request_, response, next) => {
 
     response.json(toEntryDto(entry))
   } catch (error) {
+    next(error)
+  }
+})
+
+router.post('/bulk-import', async (request_, response, next) => {
+  try {
+    const body = request_.body as Record<string, unknown> | undefined
+
+    if (!body || typeof body !== 'object') {
+      response.status(400).json({ error: 'Request body is required' })
+      return
+    }
+
+    if (!hasOnlyKeys(body, ['channelId', 'version', 'entries'])) {
+      response.status(400).json({
+        error: 'Only channelId, version, and entries are allowed in the request body'
+      })
+      return
+    }
+
+    const channelId = resolveOwnedChannelId(request_, response, body.channelId)
+
+    if (!channelId) {
+      return
+    }
+
+    if (body.version !== 1) {
+      response.status(400).json({ error: 'version must be 1' })
+      return
+    }
+
+    if (!Array.isArray(body.entries) || body.entries.length === 0) {
+      response.status(400).json({ error: 'entries must be a non-empty array' })
+      return
+    }
+
+    const entries = []
+
+    for (const [index, item] of body.entries.entries()) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        response.status(400).json({ error: `entries[${index}] must be an object` })
+        return
+      }
+
+      const entry = item as Record<string, unknown>
+
+      if (!hasOnlyKeys(entry, ['question', 'answer', 'enabled'])) {
+        response.status(400).json({
+          error: `entries[${index}] may only include question, answer, and enabled`
+        })
+        return
+      }
+
+      if (!isNonEmptyString(entry.question)) {
+        response.status(400).json({
+          error: `entries[${index}].question is required and must be a non-empty string`
+        })
+        return
+      }
+
+      if (!isNonEmptyString(entry.answer)) {
+        response.status(400).json({
+          error: `entries[${index}].answer is required and must be a non-empty string`
+        })
+        return
+      }
+
+      if (entry.enabled !== undefined && typeof entry.enabled !== 'boolean') {
+        response.status(400).json({
+          error: `entries[${index}].enabled must be a boolean`
+        })
+        return
+      }
+
+      entries.push({
+        question: entry.question,
+        answer: entry.answer,
+        enabled: entry.enabled
+      })
+    }
+
+    const result = await importEntries(channelId, entries)
+
+    response.json({
+      createdCount: result.createdCount,
+      updatedCount: result.updatedCount,
+      unchangedCount: result.unchangedCount,
+      totalCount: result.totalCount,
+      entries: result.entries.map(toEntryDto)
+    })
+  } catch (error) {
+    if (error instanceof QnaServiceError) {
+      if (
+        error.code === 'NORMALIZED_EMPTY' ||
+        error.code === 'DUPLICATE_IMPORT_QUESTION'
+      ) {
+        response.status(400).json({ error: error.message })
+        return
+      }
+
+      if (error.code === 'DUPLICATE_QUESTION') {
+        response.status(409).json({ error: error.message })
+        return
+      }
+    }
+
     next(error)
   }
 })

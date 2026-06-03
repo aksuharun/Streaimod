@@ -1,6 +1,7 @@
 import { QnaEntry } from '../../src/models/qna-entry.js'
 import {
   createEntry,
+  importEntries,
   normalizeQuestionText,
   QnaServiceError,
   updateEntry
@@ -278,5 +279,116 @@ describe('updateEntry', () => {
     await expect(
       updateEntry(String(entry._id), { question: 'New question' })
     ).rejects.toThrow('Some other DB error')
+  })
+})
+
+describe('importEntries', () => {
+  beforeAll(() => {
+    registerTestModel(QnaEntry)
+  })
+
+  beforeEach(async () => {
+    await clearTestDatabase()
+  })
+
+  it('creates new entries and defaults enabled to true', async () => {
+    const result = await importEntries(' channel-1 ', [
+      {
+        question: 'What is the schedule?',
+        answer: 'Weekdays at 3 PM EST'
+      }
+    ])
+
+    expect(result).toMatchObject({
+      createdCount: 1,
+      updatedCount: 0,
+      unchangedCount: 0,
+      totalCount: 1
+    })
+    expect(result.entries[0]?.channelId).toBe('channel-1')
+    expect(result.entries[0]?.enabled).toBe(true)
+  })
+
+  it('updates an existing entry matched by normalized question', async () => {
+    await createEntry({
+      channelId: 'channel-1',
+      question: 'What is the schedule?',
+      answer: 'Old answer',
+      enabled: true
+    })
+
+    const result = await importEntries('channel-1', [
+      {
+        question: '  WHAT IS THE SCHEDULE?? ',
+        answer: 'New answer',
+        enabled: false
+      }
+    ])
+
+    expect(result).toMatchObject({
+      createdCount: 0,
+      updatedCount: 1,
+      unchangedCount: 0,
+      totalCount: 1
+    })
+    expect(result.entries[0]?.question).toBe('WHAT IS THE SCHEDULE??')
+    expect(result.entries[0]?.answer).toBe('New answer')
+    expect(result.entries[0]?.enabled).toBe(false)
+  })
+
+  it('counts unchanged entries separately', async () => {
+    await createEntry({
+      channelId: 'channel-1',
+      question: 'What is the schedule?',
+      answer: 'Weekdays at 3 PM EST',
+      enabled: true
+    })
+
+    const result = await importEntries('channel-1', [
+      {
+        question: 'What is the schedule?',
+        answer: 'Weekdays at 3 PM EST',
+        enabled: true
+      }
+    ])
+
+    expect(result).toMatchObject({
+      createdCount: 0,
+      updatedCount: 0,
+      unchangedCount: 1,
+      totalCount: 1
+    })
+  })
+
+  it('rejects duplicated normalized questions inside the payload', async () => {
+    await expect(
+      importEntries('channel-1', [
+        {
+          question: 'Yasin kaç?',
+          answer: '22'
+        },
+        {
+          question: 'Yasin kac?',
+          answer: '22'
+        }
+      ])
+    ).rejects.toMatchObject({
+      name: 'QnaServiceError',
+      code: 'DUPLICATE_IMPORT_QUESTION'
+    })
+  })
+
+  it('rejects a payload entry whose question normalizes to empty', async () => {
+    await expect(
+      importEntries('channel-1', [
+        {
+          question: '???',
+          answer: 'Nope'
+        }
+      ])
+    ).rejects.toMatchObject({
+      name: 'QnaServiceError',
+      code: 'NORMALIZED_EMPTY'
+    })
   })
 })
