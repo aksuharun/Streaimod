@@ -11,6 +11,8 @@ import {
 } from 'react'
 import {
   ArrowUpRight,
+  BarChart3,
+  Clock3,
   LayoutDashboard,
   LogOut,
   MessageSquareText,
@@ -111,6 +113,11 @@ const appLinks: Array<{ href: AppRoute; label: string; icon: typeof LayoutDashbo
   { href: '/qna', label: 'Q&A Rules', icon: MessageSquareText },
   { href: '/commands', label: 'Commands', icon: Terminal },
   { href: '/moderation', label: 'Moderation Rules', icon: ShieldAlert }
+]
+
+const comingSoonLinks: Array<{ label: string; icon: typeof LayoutDashboard }> = [
+  { label: 'Scheduled messages', icon: Clock3 },
+  { label: 'Automated polls', icon: BarChart3 }
 ]
 
 const featureCards = [
@@ -472,17 +479,37 @@ function AppShell(props: {
         </section>
 
         <nav className="sidebar-nav" aria-label="Application navigation">
-          {appLinks.map((link) => (
-            <button
-              key={link.href}
-              type="button"
-              className={`nav-link ${props.currentPath === link.href ? 'nav-link-active' : ''}`}
-              onClick={() => props.onNavigate(link.href)}
-            >
-              <link.icon size={16} strokeWidth={2} />
-              {link.label}
-            </button>
-          ))}
+          <div className="nav-group">
+            {appLinks.map((link) => (
+              <button
+                key={link.href}
+                type="button"
+                className={`nav-link ${props.currentPath === link.href ? 'nav-link-active' : ''}`}
+                onClick={() => props.onNavigate(link.href)}
+              >
+                <link.icon size={16} strokeWidth={2} />
+                {link.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="nav-separator" role="separator" aria-label="Coming soon">
+            <span>Coming soon</span>
+          </div>
+
+          <div className="nav-group">
+            {comingSoonLinks.map((link) => (
+              <button
+                key={link.label}
+                type="button"
+                className="nav-link nav-link-disabled"
+                disabled
+              >
+                <link.icon size={16} strokeWidth={2} />
+                {link.label}
+              </button>
+            ))}
+          </div>
         </nav>
 
         <div className="sidebar-footer">

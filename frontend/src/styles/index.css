@@ -854,6 +854,30 @@ a {
   gap: 8px;
 }
 
+.nav-group {
+  display: grid;
+  gap: 8px;
+}
+
+.nav-separator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 2px;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.nav-separator::before,
+.nav-separator::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
 .nav-link {
   padding: 13px 14px;
   border-radius: 12px;
@@ -868,6 +892,15 @@ a {
   background: var(--surface);
   border-color: var(--line);
   color: var(--text);
+}
+
+.nav-link-disabled {
+  color: var(--text-muted);
+  opacity: 0.72;
+}
+
+.nav-link-disabled:disabled {
+  cursor: not-allowed;
 }
 
 .sidebar-footer {
