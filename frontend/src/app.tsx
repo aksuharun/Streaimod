@@ -10,7 +10,14 @@ import {
   type ReactNode
 } from 'react'
 import {
+  CircleAlert,
+  ClipboardCheck,
+  FileJson,
+  FileUp,
   ArrowUpRight,
+  Sparkles,
+  WandSparkles,
+  CheckCheck,
   LayoutDashboard,
   LogOut,
   MessageSquareText,
@@ -103,6 +110,288 @@ const qnaBulkImportPrompt = [
 ].join('\n')
 
 const qnaBulkImportChatGptUrl = `https://chatgpt.com/?prompt=${encodeURIComponent(qnaBulkImportPrompt)}`
+const LEADING_QUESTION_MARK_PATTERN = /^[?\u00BF\uFF1F]+/
+const TRAILING_QUESTION_PUNCTUATION_PATTERN = /[?!\u00BF\uFF01\uFF1F]*[?\u00BF\uFF1F][?!\u00BF\uFF01\uFF1F]*$/
+const COMBINING_MARKS_PATTERN = /[\u0300-\u036f]/g
+const TURKISH_DOTLESS_I_PATTERN = /\u0131/g
+const BULK_IMPORT_ROOT_KEYS = ['version', 'entries'] as const
+const BULK_IMPORT_ENTRY_KEYS = ['question', 'answer', 'enabled'] as const
+
+type BulkImportStatus = 'empty' | 'invalid' | 'ready'
+type BulkImportEntryStatus = 'create' | 'update' | 'unchanged'
+
+interface BulkImportPreviewEntry {
+  index: number
+  question: string
+  answer: string
+  normalizedQuestion: string
+  enabled: boolean
+  status: BulkImportEntryStatus
+}
+
+interface BulkImportInspection {
+  status: BulkImportStatus
+  payload?: QnaBulkImportPayload
+  issues: string[]
+  stats: {
+    total: number
+    created: number
+    updated: number
+    unchanged: number
+    enabled: number
+    disabled: number
+  }
+  previewEntries: BulkImportPreviewEntry[]
+}
+
+function hasOnlyKeys(record: Record<string, unknown>, allowedKeys: readonly string[]): boolean {
+  return Object.keys(record).every((key) => allowedKeys.includes(key))
+}
+
+function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`
+}
+
+function normalizeBulkImportQuestion(input: string): string {
+  return input
+    .trim()
+    .normalize('NFD')
+    .replace(COMBINING_MARKS_PATTERN, '')
+    .replace(TURKISH_DOTLESS_I_PATTERN, 'i')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(LEADING_QUESTION_MARK_PATTERN, '')
+    .replace(TRAILING_QUESTION_PUNCTUATION_PATTERN, '')
+    .trim()
+}
+
+function inspectQnaBulkImport(rawText: string, existingEntries: QnaEntry[]): BulkImportInspection {
+  const trimmed = rawText.trim()
+
+  if (!trimmed) {
+    return {
+      status: 'empty',
+      issues: [],
+      stats: {
+        total: 0,
+        created: 0,
+        updated: 0,
+        unchanged: 0,
+        enabled: 0,
+        disabled: 0
+      },
+      previewEntries: []
+    }
+  }
+
+  let parsed: unknown
+
+  try {
+    parsed = JSON.parse(trimmed)
+  } catch {
+    return {
+      status: 'invalid',
+      issues: ['The bulk editor only accepts valid JSON.'],
+      stats: {
+        total: 0,
+        created: 0,
+        updated: 0,
+        unchanged: 0,
+        enabled: 0,
+        disabled: 0
+      },
+      previewEntries: []
+    }
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return {
+      status: 'invalid',
+      issues: ['The top level must be a single JSON object.'],
+      stats: {
+        total: 0,
+        created: 0,
+        updated: 0,
+        unchanged: 0,
+        enabled: 0,
+        disabled: 0
+      },
+      previewEntries: []
+    }
+  }
+
+  const body = parsed as Record<string, unknown>
+  const issues: string[] = []
+  const previewEntries: BulkImportPreviewEntry[] = []
+  const sanitizedEntries: QnaBulkImportPayload['entries'] = []
+  const existingByNormalized = new Map(
+    existingEntries.map((entry) => [entry.normalizedQuestion, entry] as const)
+  )
+  const payloadIndexes = new Map<string, number>()
+  let created = 0
+  let updated = 0
+  let unchanged = 0
+  let enabled = 0
+  let disabled = 0
+
+  if (!hasOnlyKeys(body, BULK_IMPORT_ROOT_KEYS)) {
+    issues.push('Only version and entries are allowed in the top-level object.')
+  }
+
+  if (body.version !== 1) {
+    issues.push('version must be 1.')
+  }
+
+  if (!Array.isArray(body.entries)) {
+    issues.push('entries must be a non-empty array.')
+  } else if (body.entries.length === 0) {
+    issues.push('entries must be a non-empty array.')
+  } else {
+    for (const [index, item] of body.entries.entries()) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        issues.push(`entries[${index}] must be an object.`)
+        continue
+      }
+
+      const entry = item as Record<string, unknown>
+
+      if (!hasOnlyKeys(entry, BULK_IMPORT_ENTRY_KEYS)) {
+        issues.push(`entries[${index}] may only include question, answer, and enabled.`)
+      }
+
+      if (typeof entry.question !== 'string' || entry.question.trim().length === 0) {
+        issues.push(`entries[${index}].question is required and must be a non-empty string.`)
+      }
+
+      if (typeof entry.answer !== 'string' || entry.answer.trim().length === 0) {
+        issues.push(`entries[${index}].answer is required and must be a non-empty string.`)
+      }
+
+      if (entry.enabled !== undefined && typeof entry.enabled !== 'boolean') {
+        issues.push(`entries[${index}].enabled must be a boolean.`)
+      }
+
+      if (
+        typeof entry.question !== 'string' ||
+        entry.question.trim().length === 0 ||
+        typeof entry.answer !== 'string' ||
+        entry.answer.trim().length === 0 ||
+        (entry.enabled !== undefined && typeof entry.enabled !== 'boolean')
+      ) {
+        continue
+      }
+
+      const question = entry.question.trim()
+      const answer = entry.answer.trim()
+      const normalizedQuestion = normalizeBulkImportQuestion(question)
+      const isEnabled = entry.enabled ?? true
+
+      if (normalizedQuestion.length === 0) {
+        issues.push(`Entry ${index + 1} question resolves to an empty value after normalization.`)
+        continue
+      }
+
+      const duplicateIndex = payloadIndexes.get(normalizedQuestion)
+
+      if (duplicateIndex !== undefined) {
+        issues.push(
+          `Entries ${duplicateIndex + 1} and ${index + 1} resolve to the same normalized question.`
+        )
+        continue
+      }
+
+      payloadIndexes.set(normalizedQuestion, index)
+
+      const existing = existingByNormalized.get(normalizedQuestion)
+      const status: BulkImportEntryStatus = !existing
+        ? 'create'
+        : existing.question !== question ||
+            existing.answer !== answer ||
+            existing.enabled !== isEnabled
+          ? 'update'
+          : 'unchanged'
+
+      if (status === 'create') {
+        created += 1
+      } else if (status === 'update') {
+        updated += 1
+      } else {
+        unchanged += 1
+      }
+
+      if (isEnabled) {
+        enabled += 1
+      } else {
+        disabled += 1
+      }
+
+      sanitizedEntries.push({
+        question,
+        answer,
+        enabled: isEnabled
+      })
+
+      previewEntries.push({
+        index,
+        question,
+        answer,
+        normalizedQuestion,
+        enabled: isEnabled,
+        status
+      })
+    }
+  }
+
+  const status: BulkImportStatus = issues.length > 0 ? 'invalid' : 'ready'
+
+  return {
+    status,
+    payload: status === 'ready'
+      ? {
+          version: 1,
+          entries: sanitizedEntries
+        }
+      : undefined,
+    issues,
+    stats: {
+      total: previewEntries.length,
+      created,
+      updated,
+      unchanged,
+      enabled,
+      disabled
+    },
+    previewEntries
+  }
+}
+
+function getBulkImportStatusCopy(inspection: BulkImportInspection): {
+  eyebrow: string
+  title: string
+  description: string
+} {
+  if (inspection.status === 'empty') {
+    return {
+      eyebrow: 'Preflight',
+      title: 'Paste or load an import object',
+      description: 'The editor will validate the schema and preview what will be created, updated, or left untouched before anything is written.'
+    }
+  }
+
+  if (inspection.status === 'invalid') {
+    return {
+      eyebrow: 'Needs fixes',
+      title: 'Import is blocked',
+      description: inspection.issues[0] ?? 'Resolve the validation issues below before importing.'
+    }
+  }
+
+  return {
+    eyebrow: 'Ready to import',
+    title: `${pluralize(inspection.stats.total, 'entry')} prepared`,
+    description: `${pluralize(inspection.stats.created, 'rule')} will be created, ${pluralize(inspection.stats.updated, 'rule')} updated, and ${pluralize(inspection.stats.unchanged, 'rule')} left unchanged.`
+  }
+}
 
 type ChannelFeatureToggle = 'qnaEnabled' | 'commandsEnabled' | 'moderationEnabled'
 
@@ -339,7 +628,7 @@ function Modal(props: {
   description: string
   children: ReactNode
   onClose: () => void
-  wide?: boolean
+  size?: 'default' | 'wide'
 }) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -355,7 +644,7 @@ function Modal(props: {
   return (
     <div className="modal-shell" role="dialog" aria-modal="true" aria-label={props.title}>
       <div className="modal-backdrop" onClick={props.onClose} />
-      <div className={`modal-card ${props.wide ? 'modal-card-wide' : ''}`}>
+      <div className={`modal-card modal-card-${props.size ?? 'default'}`}>
         <div className="modal-header">
           <div>
             <p className="eyebrow">{props.eyebrow ?? 'Editor'}</p>
@@ -1184,6 +1473,9 @@ function QnaPage(props: {
         )
       })
     : entries
+  const bulkImportInspection = inspectQnaBulkImport(bulkJsonText, entries)
+  const bulkImportStatusCopy = getBulkImportStatusCopy(bulkImportInspection)
+  const bulkPreviewEntries = bulkImportInspection.previewEntries.slice(0, 4)
 
   function openCreateModal() {
     setEditingEntry(null)
@@ -1205,6 +1497,11 @@ function QnaPage(props: {
     setBulkJsonText('')
     setBulkFileName(null)
     setBulkModalOpen(true)
+  }
+
+  function applyBulkImportExample() {
+    setBulkJsonText(qnaBulkImportExample)
+    setBulkFileName(null)
   }
 
   async function loadBulkImportFile(event: ChangeEvent<HTMLInputElement>) {
@@ -1302,9 +1599,9 @@ function QnaPage(props: {
   async function submitBulkImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const trimmed = bulkJsonText.trim()
+    const inspection = inspectQnaBulkImport(bulkJsonText, entries)
 
-    if (!trimmed) {
+    if (inspection.status === 'empty') {
       showErrorToast({
         title: 'Validation error',
         description: 'Paste a JSON object or load a .json file before importing.'
@@ -1312,24 +1609,10 @@ function QnaPage(props: {
       return
     }
 
-    let payload: QnaBulkImportPayload
-
-    try {
-      const parsed = JSON.parse(trimmed) as unknown
-
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        showErrorToast({
-          title: 'Invalid JSON',
-          description: 'The bulk editor expects a single JSON object at the top level.'
-        })
-        return
-      }
-
-      payload = parsed as QnaBulkImportPayload
-    } catch {
+    if (inspection.status !== 'ready' || !inspection.payload) {
       showErrorToast({
-        title: 'Invalid JSON',
-        description: 'The bulk editor only accepts a valid JSON object.'
+        title: 'Bulk import not ready',
+        description: inspection.issues[0] ?? 'Fix the import payload before submitting.'
       })
       return
     }
@@ -1337,7 +1620,7 @@ function QnaPage(props: {
     setBulkImporting(true)
 
     try {
-      const result = await api.importQnaEntries(props.activeChannel.channelId, payload)
+      const result = await api.importQnaEntries(props.activeChannel.channelId, inspection.payload)
       const refreshedEntries = await api.getQnaEntries(props.activeChannel.channelId)
       setEntries(refreshedEntries)
       setBulkModalOpen(false)
@@ -1613,102 +1896,242 @@ function QnaPage(props: {
         <Modal
           title="Bulk edit Q&A rules"
           description="Paste a valid import object or load a JSON file. Matching questions update in place by normalized question."
-          wide
+          size="wide"
           onClose={() => {
             if (!bulkImporting) setBulkModalOpen(false)
           }}
         >
           <form className="editor-form bulk-editor-form" onSubmit={(event) => void submitBulkImport(event)}>
-            <section className="bulk-flow">
-              <article className="bulk-step">
-                <span className="bulk-step-index">1</span>
-                <div>
-                  <strong>Prepare the JSON</strong>
-                  <p>Write it yourself, upload a file, or generate it from your transcript.</p>
+            <section className={`bulk-status-banner bulk-status-${bulkImportInspection.status}`}>
+              <div className="bulk-status-icon">
+                {bulkImportInspection.status === 'ready' ? (
+                  <CheckCheck size={20} strokeWidth={2} />
+                ) : bulkImportInspection.status === 'invalid' ? (
+                  <CircleAlert size={20} strokeWidth={2} />
+                ) : (
+                  <FileJson size={20} strokeWidth={2} />
+                )}
+              </div>
+              <div className="bulk-status-copy">
+                <p className="eyebrow">{bulkImportStatusCopy.eyebrow}</p>
+                <h3>{bulkImportStatusCopy.title}</h3>
+                <p>{bulkImportStatusCopy.description}</p>
+              </div>
+              <div className="bulk-status-metrics" aria-label="Bulk import summary">
+                <div className="bulk-status-metric">
+                  <strong>{bulkImportInspection.stats.total}</strong>
+                  <span>Validated</span>
                 </div>
-              </article>
-              <article className="bulk-step">
-                <span className="bulk-step-index">2</span>
-                <div>
-                  <strong>Review the items</strong>
-                  <p>Questions update by normalized match, so duplicates become edits instead of extra rows.</p>
+                <div className="bulk-status-metric">
+                  <strong>{bulkImportInspection.stats.created}</strong>
+                  <span>Create</span>
                 </div>
-              </article>
-              <article className="bulk-step">
-                <span className="bulk-step-index">3</span>
-                <div>
-                  <strong>Apply the bulk edit</strong>
-                  <p>New items are created, matching items are updated, and unchanged ones stay as-is.</p>
+                <div className="bulk-status-metric">
+                  <strong>{bulkImportInspection.stats.updated}</strong>
+                  <span>Update</span>
                 </div>
-              </article>
+                <div className="bulk-status-metric">
+                  <strong>{bulkImportInspection.stats.unchanged}</strong>
+                  <span>Unchanged</span>
+                </div>
+              </div>
             </section>
 
-            <section className="bulk-layout">
-              <div className="bulk-primary-column">
-                <label className="bulk-editor-card">
-                  <span>Paste the import object</span>
+            <section className="bulk-workspace">
+              <div className="bulk-main-column">
+                <article className="bulk-editor-card">
+                  <div className="bulk-card-header">
+                    <div>
+                      <p className="eyebrow">Import object</p>
+                      <h3>Review the JSON before it writes</h3>
+                      <p>Paste a payload directly or load a local file. The preview updates as the schema becomes valid.</p>
+                    </div>
+                    <div className="bulk-card-actions">
+                      <button type="button" className="ghost-button" onClick={applyBulkImportExample}>
+                        <ClipboardCheck size={16} strokeWidth={2} />
+                        Use example
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        disabled={!bulkJsonText}
+                        onClick={() => {
+                          setBulkJsonText('')
+                          setBulkFileName(null)
+                        }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bulk-editor-meta">
+                    <span className="bulk-meta-pill">
+                      <FileJson size={15} strokeWidth={2} />
+                      Schema: version + entries
+                    </span>
+                    {bulkFileName && (
+                      <span className="bulk-meta-pill">
+                        <FileUp size={15} strokeWidth={2} />
+                        Loaded from {bulkFileName}
+                      </span>
+                    )}
+                  </div>
+
                   <textarea
-                    rows={12}
+                    rows={16}
                     className="bulk-json-textarea"
                     value={bulkJsonText}
                     onChange={(event) => setBulkJsonText(event.target.value)}
                     placeholder={qnaBulkImportExample}
                     spellCheck={false}
                   />
-                </label>
+                </article>
 
-                <div className="bulk-secondary-row">
-                  <div className="bulk-upload-card">
+                {bulkImportInspection.issues.length > 0 && (
+                  <article className="bulk-issues-card">
+                    <div className="bulk-card-header">
+                      <div>
+                        <p className="eyebrow">Validation issues</p>
+                        <h3>Fix these before importing</h3>
+                      </div>
+                    </div>
+                    <ul className="bulk-issue-list">
+                      {bulkImportInspection.issues.slice(0, 6).map((issue) => (
+                        <li key={issue}>
+                          <CircleAlert size={16} strokeWidth={2} />
+                          <span>{issue}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {bulkImportInspection.issues.length > 6 && (
+                      <p className="bulk-issue-overflow">
+                        {pluralize(bulkImportInspection.issues.length - 6, 'more issue')} hidden until the payload is cleaned up.
+                      </p>
+                    )}
+                  </article>
+                )}
+
+                <div className="bulk-utility-grid">
+                  <article className="bulk-upload-card">
                     <div className="bulk-input-header">
                       <div>
-                        <strong>Upload a JSON file</strong>
-                        <p>
-                          Load a `.json` file instead of pasting. The file contents will appear in the editor above.
-                        </p>
+                        <p className="eyebrow">Local file</p>
+                        <strong>Upload a JSON draft</strong>
+                        <p>Load a `.json` file and continue editing the contents in place.</p>
                       </div>
-                      {bulkFileName && <span className="bulk-file-pill">{bulkFileName}</span>}
+                      <span className="bulk-file-pill">{bulkFileName ?? 'No file loaded'}</span>
                     </div>
                     <input
                       type="file"
                       accept=".json,application/json"
                       onChange={(event) => void loadBulkImportFile(event)}
                     />
-                  </div>
+                  </article>
 
-                  <div className="bulk-example-card">
+                  <article className="bulk-example-card">
                     <div className="bulk-input-header">
                       <div>
-                        <strong>Example object</strong>
-                        <p>Use this as a quick template if you are building the JSON manually.</p>
+                        <p className="eyebrow">Reference</p>
+                        <strong>Minimal valid example</strong>
+                        <p>Use this when you want to hand-build the import object.</p>
                       </div>
-                      <button type="button" className="ghost-button" onClick={() => setBulkJsonText(qnaBulkImportExample)}>
-                        Use example
-                      </button>
                     </div>
-                    <pre className="code-block code-block-compact">{qnaBulkImportExample}</pre>
-                  </div>
+                    <pre className="code-block">{qnaBulkImportExample}</pre>
+                  </article>
                 </div>
               </div>
 
-              <aside className="bulk-side-column">
-                <article className="panel bulk-help-card">
-                  <p className="eyebrow">Quick rules</p>
-                  <h3>Accepted schema</h3>
+              <aside className="bulk-sidebar">
+                <article className="panel bulk-summary-card">
+                  <div className="bulk-card-header">
+                    <div>
+                      <p className="eyebrow">Change summary</p>
+                      <h3>What this import will do</h3>
+                    </div>
+                  </div>
+                  <div className="bulk-stat-grid">
+                    <div className="bulk-stat-tile">
+                      <span>Create</span>
+                      <strong>{bulkImportInspection.stats.created}</strong>
+                    </div>
+                    <div className="bulk-stat-tile">
+                      <span>Update</span>
+                      <strong>{bulkImportInspection.stats.updated}</strong>
+                    </div>
+                    <div className="bulk-stat-tile">
+                      <span>Keep</span>
+                      <strong>{bulkImportInspection.stats.unchanged}</strong>
+                    </div>
+                    <div className="bulk-stat-tile">
+                      <span>Paused</span>
+                      <strong>{bulkImportInspection.stats.disabled}</strong>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="panel bulk-summary-card">
+                  <div className="bulk-card-header">
+                    <div>
+                      <p className="eyebrow">Entry review</p>
+                      <h3>First validated items</h3>
+                    </div>
+                  </div>
+                  {bulkPreviewEntries.length === 0 ? (
+                    <p className="bulk-empty-note">Valid entries will appear here once the payload starts parsing cleanly.</p>
+                  ) : (
+                    <div className="bulk-preview-list">
+                      {bulkPreviewEntries.map((entry) => (
+                        <article key={`${entry.normalizedQuestion}-${entry.index}`} className="bulk-preview-item">
+                          <div className="bulk-preview-top">
+                            <span className={`bulk-preview-badge bulk-preview-badge-${entry.status}`}>
+                              {entry.status}
+                            </span>
+                            <span className={`bulk-preview-state ${entry.enabled ? 'bulk-preview-state-on' : 'bulk-preview-state-off'}`}>
+                              {entry.enabled ? 'Active' : 'Paused'}
+                            </span>
+                          </div>
+                          <strong>{entry.question}</strong>
+                          <p>{entry.answer}</p>
+                          <small>Normalized as “{entry.normalizedQuestion}”</small>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                  {bulkImportInspection.previewEntries.length > bulkPreviewEntries.length && (
+                    <p className="bulk-issue-overflow">
+                      {pluralize(
+                        bulkImportInspection.previewEntries.length - bulkPreviewEntries.length,
+                        'more validated entry'
+                      )} ready beyond this preview.
+                    </p>
+                  )}
+                </article>
+
+                <article className="panel bulk-summary-card">
+                  <div className="bulk-card-header">
+                    <div>
+                      <p className="eyebrow">Accepted schema</p>
+                      <h3>Only send the fields the API accepts</h3>
+                    </div>
+                  </div>
                   <ul className="bulk-help-list">
-                    <li>Use one top-level object with a version field and an entries array.</li>
-                    <li>Version must be 1.</li>
-                    <li>Every entry needs a question and an answer.</li>
-                    <li>Enabled is optional and defaults to active.</li>
-                    <li>Leave out channelId, ids, timestamps, and normalized fields.</li>
+                    <li>Top level: `version` and `entries` only.</li>
+                    <li>`version` must stay `1`.</li>
+                    <li>Each entry needs `question` and `answer`.</li>
+                    <li>`enabled` is optional and defaults to active.</li>
+                    <li>Duplicate normalized questions block the import.</li>
                   </ul>
                 </article>
 
                 <article className="panel bulk-help-card bulk-help-card-accent">
-                  <p className="eyebrow">Generate with ChatGPT</p>
-                  <h3>Turn stream material into Q&A</h3>
-                  <p>
-                    Open ChatGPT with a starter prompt, attach your transcript, FAQ, or notes, and ask it to return a valid import object.
-                  </p>
+                  <div className="bulk-card-header">
+                    <div>
+                      <p className="eyebrow">Generate with ChatGPT</p>
+                      <h3>Turn transcripts into clean Q&A</h3>
+                      <p>Open ChatGPT with the starter prompt, attach your transcript, FAQ, or notes, and ask for valid JSON only.</p>
+                    </div>
+                  </div>
                   <div className="bulk-link-row">
                     <a
                       href={qnaBulkImportChatGptUrl}
@@ -1716,10 +2139,11 @@ function QnaPage(props: {
                       rel="noreferrer"
                       className="ghost-button external-link-button"
                     >
-                      <ArrowUpRight size={16} strokeWidth={2} />
+                      <WandSparkles size={16} strokeWidth={2} />
                       Open ChatGPT
                     </a>
                     <button type="button" className="ghost-button" onClick={() => void copyBulkImportPrompt()}>
+                      <Sparkles size={16} strokeWidth={2} />
                       Copy prompt
                     </button>
                   </div>
@@ -1731,7 +2155,11 @@ function QnaPage(props: {
               <button type="button" className="ghost-button" disabled={bulkImporting} onClick={() => setBulkModalOpen(false)}>
                 Cancel
               </button>
-              <button type="submit" className="primary-button" disabled={bulkImporting}>
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={bulkImporting || bulkImportInspection.status !== 'ready'}
+              >
                 {bulkImporting ? 'Importing...' : 'Apply bulk edit'}
               </button>
             </div>
@@ -2176,7 +2604,6 @@ function ModerationPage(props: {
   const [dragOverColumn, setDragOverColumn] = useState<BoardColumn | ''>('')
   const [movingIds, setMovingIds] = useState<Record<string, boolean>>({})
   const [togglingIds, setTogglingIds] = useState<Record<string, boolean>>({})
-  const [consentModalOpen, setConsentModalOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -2231,25 +2658,6 @@ function ModerationPage(props: {
   const hasEnabledAgentCategory = categories.some((category) => category.enabled)
   const moderationEnableBlocked =
     !props.activeChannel.moderationEnabled && !loading && !error && !hasEnabledAgentCategory
-
-  async function applyAgentToggle(enablingAgent: boolean) {
-    try {
-      await props.onUpdateChannelSettings({
-        moderationEnabled: enablingAgent
-      })
-      showSuccessToast({
-        title: enablingAgent ? 'Moderation agent enabled' : 'Moderation agent paused',
-        description: enablingAgent
-          ? 'Timeout and ban workflows will evaluate incoming live chat again.'
-          : 'Assigned categories stay saved, but runtime enforcement is paused.'
-      })
-    } catch (toggleError) {
-      showErrorToast({
-        title: 'Agent update failed',
-        description: toggleError instanceof Error ? toggleError.message : 'Failed to update the moderation agent setting.'
-      })
-    }
-  }
 
   async function moveCard(catalogId: string, targetColumn: BoardColumn) {
     if (!catalogId || movingIds[catalogId]) return
@@ -2358,18 +2766,22 @@ function ModerationPage(props: {
       return
     }
 
-    const enablingAgent = !props.activeChannel.moderationEnabled
-    if (enablingAgent) {
-      setConsentModalOpen(true)
-      return
+    try {
+      await props.onUpdateChannelSettings({
+        moderationEnabled: !props.activeChannel.moderationEnabled
+      })
+      showSuccessToast({
+        title: !props.activeChannel.moderationEnabled ? 'Moderation agent enabled' : 'Moderation agent paused',
+        description: !props.activeChannel.moderationEnabled
+          ? 'Timeout and ban workflows will evaluate incoming live chat again.'
+          : 'Assigned categories stay saved, but runtime enforcement is paused.'
+      })
+    } catch (toggleError) {
+      showErrorToast({
+        title: 'Agent update failed',
+        description: toggleError instanceof Error ? toggleError.message : 'Failed to update the moderation agent setting.'
+      })
     }
-
-    await applyAgentToggle(false)
-  }
-
-  async function confirmEnableAgent() {
-    setConsentModalOpen(false)
-    await applyAgentToggle(true)
   }
 
   function renderLane(column: BoardColumn, title: string, description: string, items: typeof boardItems) {
@@ -2468,10 +2880,7 @@ function ModerationPage(props: {
       <header className="page-header">
         <div>
           <p className="eyebrow">Chat safety</p>
-          <div className="title-row">
-            <h1>Moderation Rules</h1>
-            <span className="badge badge-experimental">Experimental</span>
-          </div>
+          <h1>Moderation Rules</h1>
           <p className="page-text">
             Route each safety category to timeout or ban.
           </p>
@@ -2486,9 +2895,6 @@ function ModerationPage(props: {
             {props.activeChannel.moderationEnabled
               ? 'The moderation workflow is active and can issue timeout or ban decisions from assigned categories.'
               : 'The moderation workflow is paused. Your board stays saved, but runtime enforcement is disabled.'}
-          </p>
-          <p className="experimental-warning">
-            Experimental feature: moderation can misfire, take a moment to enable, or fail on the first attempt.
           </p>
           {moderationEnableBlocked && (
             <p>Enable at least one assigned moderation category before turning this workflow on.</p>
@@ -2538,45 +2944,6 @@ function ModerationPage(props: {
           {renderLane('timeout', 'Timeout Agent', 'Temporary enforcement for spam, escalation control, and lower-severity disruption.', timeoutLane)}
           {renderLane('ban', 'Ban Agent', 'Permanent enforcement for severe abuse, threats, scams, or malicious behavior.', banLane)}
         </section>
-      )}
-
-      {consentModalOpen && (
-        <Modal
-          eyebrow="Experimental feature"
-          title="Enable moderation agent"
-          description="Confirm that you understand the moderation agent is still experimental before turning it on."
-          onClose={() => {
-            if (!props.channelSettingsUpdating) setConsentModalOpen(false)
-          }}
-        >
-          <div className="consent-flow">
-            <p className="experimental-warning">
-              Experimental feature: moderation can misfire, take a moment to enable, or fail on the first attempt.
-            </p>
-            <ul className="consent-list">
-              <li>Timeout and ban actions can behave inconsistently while this agent is active.</li>
-              <li>Review assigned categories before enabling the workflow on a live channel.</li>
-            </ul>
-            <div className="editor-actions">
-              <button
-                type="button"
-                className="ghost-button"
-                disabled={props.channelSettingsUpdating}
-                onClick={() => setConsentModalOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="primary-button"
-                disabled={props.channelSettingsUpdating}
-                onClick={() => void confirmEnableAgent()}
-              >
-                {props.channelSettingsUpdating ? 'Enabling...' : 'Enable anyway'}
-              </button>
-            </div>
-          </div>
-        </Modal>
       )}
     </div>
   )
