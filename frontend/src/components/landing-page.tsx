@@ -460,6 +460,9 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
       <footer className="landing-footer landing-container">
         <LandingBrand />
         <p className="landing-footer-note">For the people behind the stream.</p>
+        <a className="landing-footer-link" href="mailto:hello@streaimod.com">
+          hello@streaimod.com
+        </a>
         <a
           className="landing-footer-link"
           href="https://github.com/aksuharun/Streaimod"
