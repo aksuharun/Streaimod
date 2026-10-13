@@ -2875,17 +2875,11 @@ export default function App() {
 
   let content: ReactNode
 
-  if (booting) {
-    content = (
-      <div className="boot-screen">
-        <div className="boot-panel">
-          <BrandLogo />
-          <strong>Loading creator control surface...</strong>
-        </div>
-      </div>
-    )
-  } else if (path === '/') {
+  if (path === '/') {
     content = <LandingScreen onNavigate={navigate} />
+  } else if (booting && path !== '/onboarding') {
+    // Wait for session validation without showing a loading screen or sign-in flash.
+    content = null
   } else if (!isAuthenticated || !activeChannel) {
     content = (
       <OnboardingScreen
