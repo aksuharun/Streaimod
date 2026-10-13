@@ -42,6 +42,7 @@ import {
   type StreamSummary
 } from './services/api'
 import LandingScreen from './components/landing-page'
+import OnboardingScreen from './components/onboarding-page'
 import { buildBackendUrl } from './services/backend-url'
 import {
   clearToasts,
@@ -659,29 +660,6 @@ function BrandLogo(props: { variant?: 'icon' | 'full' }) {
   )
 }
 
-function GoogleMark() {
-  return (
-    <svg className="google-glyph" viewBox="0 0 18 18" aria-hidden="true">
-      <path
-        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.72-1.58 2.68-3.92 2.68-6.62Z"
-        fill="#4285F4"
-      />
-      <path
-        d="M9 18c2.43 0 4.46-.8 5.95-2.18l-2.92-2.26c-.8.54-1.83.86-3.03.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z"
-        fill="#34A853"
-      />
-      <path
-        d="M3.97 10.71A5.41 5.41 0 0 1 3.69 9c0-.6.1-1.18.28-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.04l3.01-2.33Z"
-        fill="#FBBC05"
-      />
-      <path
-        d="M9 3.58c1.32 0 2.5.45 3.43 1.34l2.57-2.57A8.94 8.94 0 0 0 9 0 .9 9 0 0 0 .96 4.96l3.01 2.33c.71-2.12 2.7-3.71 5.03-3.71Z"
-        fill="#EA4335"
-      />
-    </svg>
-  )
-}
-
 function AppShell(props: {
   currentPath: string
   channel: AuthChannel | null
@@ -768,51 +746,6 @@ function AppShell(props: {
       </aside>
 
       <main className="main-content">{props.children}</main>
-    </div>
-  )
-}
-
-function OnboardingScreen(props: {
-  authenticated: boolean
-  onGoogleLogin: () => void
-  authenticating: boolean
-}) {
-  const error = new URLSearchParams(window.location.search).get('error')
-
-  return (
-    <div className="onboarding-root">
-      <div className="onboarding-panel">
-        <div className="onboarding-brand">
-          <BrandLogo variant="full" />
-        </div>
-
-        <div className="onboarding-copy">
-          <p className="eyebrow">Secure access</p>
-          <h1>Sign in</h1>
-          <p>
-            Use the Google account connected to your channel to continue.
-          </p>
-        </div>
-
-        {error && <div className="error-banner">{error}</div>}
-        {props.authenticated && <div className="success-banner">Session restored. Redirecting to your dashboard.</div>}
-
-        <button
-          type="button"
-          className="google-button giant-button"
-          disabled={props.authenticating}
-          onClick={props.onGoogleLogin}
-        >
-          <span className="google-button-content">
-            <GoogleMark />
-            <span>{props.authenticating ? 'Redirecting to Google...' : 'Continue with Google'}</span>
-          </span>
-        </button>
-
-        <p className="helper-text">
-          Your channel and saved moderation settings will be ready after sign-in.
-        </p>
-      </div>
     </div>
   )
 }

@@ -1,0 +1,68 @@
+/* Shared public-page design system, scoped away from the creator dashboard. */
+.landing,
+.onboarding-root {
+  /* Surfaces and text */
+  --landing-paper: #101318;
+  --landing-sheet: #1b2028;
+  --landing-ink: #f1f4f8;
+  --landing-muted: #b4becb;
+  --landing-line: #2e3744;
+  --landing-accent: #dde9fa;
+  --landing-accent-hover: #ffffff;
+  --landing-positive: #202c36;
+  --landing-positive-ink: #a8d8c5;
+  --landing-chat-muted: #a7b3bd;
+  --landing-warning: #edab97;
+  --landing-warning-bg: #392b2b;
+
+  /* Decorative illustration */
+  --landing-orbit-line: #242d39;
+  --landing-orbit-blue: #8eb6ee;
+  --landing-orbit-teal: #8ccfc5;
+  --landing-orbit-violet: #b6a3e7;
+  --landing-orbit-peach: #eab393;
+  --landing-preview-glow: rgb(90 142 215 / 18%);
+  --landing-floating-shadow: 0 12px 32px rgb(0 0 0 / 22%);
+
+  /* Typography: one body size at every viewport; only headings are fluid. */
+  --landing-font: 'Figtree', sans-serif;
+  --landing-display: 'Plus Jakarta Sans', sans-serif;
+  --landing-mono: 'IBM Plex Mono', monospace;
+  --landing-text-body: 1.125rem; /* 18px */
+  --landing-text-meta: 1rem; /* 16px */
+  --landing-text-brand: 1.375rem; /* 22px */
+  --landing-text-subheading: 1.5rem; /* 24px */
+  --landing-text-heading: clamp(2rem, 3.4vw, 3.1rem);
+  --landing-text-hero: clamp(2.5rem, 4.6vw, 4.2rem);
+  --landing-leading-body: 1.65;
+  --landing-leading-compact: 1.4;
+  --landing-leading-heading: 1.25;
+  --landing-leading-hero: 1.12;
+  --landing-weight-normal: 400;
+  --landing-weight-medium: 500;
+  --landing-weight-semibold: 600;
+  --landing-weight-bold: 700;
+  --landing-tracking-label: 0.04em;
+  --landing-tracking-heading: -0.04em;
+  --landing-tracking-brand: -0.05em;
+  --landing-prose-measure: 55ch;
+  --landing-chat-measure: 36ch;
+
+  /* Spacing */
+  --landing-space-2xs: 0.25rem;
+  --landing-space-xs: 0.5rem;
+  --landing-space-sm: 1rem;
+  --landing-space-md: 1.5rem;
+  --landing-space-lg: 2.5rem;
+  --landing-space-xl: 4rem;
+  --landing-space-xxl: 6rem;
+  --landing-gutter: clamp(1.25rem, 5vw, 5rem);
+
+  /* Shape and interaction */
+  --landing-radius-sm: 6px;
+  --landing-radius-md: 10px;
+  --landing-radius-lg: 16px;
+  --landing-radius-round: 50%;
+  --landing-duration-fast: 160ms;
+  --landing-border: 1px solid var(--landing-line);
+}

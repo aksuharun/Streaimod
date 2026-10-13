@@ -50,6 +50,35 @@ function LandingBrand() {
   )
 }
 
+function HeroOrbits() {
+  return (
+    <div className="landing-orbits" aria-hidden="true">
+      <span className="landing-orbit landing-orbit--inner" />
+      <span className="landing-orbit landing-orbit--middle" />
+      <span className="landing-orbit landing-orbit--outer" />
+      <span className="landing-orbit landing-orbit--edge" />
+      <span className="landing-orbit-symbol landing-orbit-symbol--answers">
+        <MessageCircle size={27} strokeWidth={1.7} />
+      </span>
+      <span className="landing-orbit-symbol landing-orbit-symbol--commands">
+        <Terminal size={27} strokeWidth={1.7} />
+      </span>
+      <span className="landing-orbit-symbol landing-orbit-symbol--rules">
+        <ShieldCheck size={27} strokeWidth={1.7} />
+      </span>
+      <span className="landing-orbit-symbol landing-orbit-symbol--stream">
+        <Play size={25} strokeWidth={1.7} />
+      </span>
+      <span className="landing-orbit-symbol landing-orbit-symbol--approved">
+        <Check size={28} strokeWidth={1.7} />
+      </span>
+      <span className="landing-orbit-symbol landing-orbit-symbol--channel">
+        <ArrowUpRight size={28} strokeWidth={1.7} />
+      </span>
+    </div>
+  )
+}
+
 function ChatPreview() {
   return (
     <figure className="landing-preview">
@@ -66,56 +95,60 @@ function ChatPreview() {
           <span className="landing-chat-example">Example</span>
         </div>
         <div className="landing-chat-body">
-          <div className="landing-chat-message">
-            <span className="landing-chat-avatar landing-chat-avatar--viewer" aria-hidden="true">
-              A
-            </span>
-            <div className="landing-chat-content">
-              <span className="landing-chat-author">
-                avery <span className="landing-chat-time">just now</span>
+          <div className="landing-chat-thread">
+            <div className="landing-chat-message">
+              <span className="landing-chat-avatar landing-chat-avatar--viewer" aria-hidden="true">
+                A
               </span>
-              <p className="landing-chat-text">Will I be able to watch the replay?</p>
+              <div className="landing-chat-content">
+                <span className="landing-chat-author">
+                  avery <span className="landing-chat-time">just now</span>
+                </span>
+                <p className="landing-chat-text">Will I be able to watch the replay?</p>
+              </div>
+            </div>
+            <div className="landing-chat-reply">
+              <span className="landing-chat-avatar landing-chat-avatar--bot" aria-hidden="true">
+                <ShieldCheck size={17} strokeWidth={1.8} />
+              </span>
+              <div className="landing-chat-content">
+                <span className="landing-chat-author">
+                  streaimod <span className="landing-chat-bot-label">BOT</span>
+                </span>
+                <p className="landing-chat-text">
+                  @avery Yep! The replay stays right here on the channel.
+                </p>
+                <span className="landing-chat-source">
+                  <Check size={13} /> Your saved answer
+                </span>
+              </div>
             </div>
           </div>
-          <div className="landing-chat-reply">
-            <span className="landing-chat-avatar landing-chat-avatar--bot" aria-hidden="true">
-              <ShieldCheck size={17} strokeWidth={1.8} />
-            </span>
-            <div className="landing-chat-content">
-              <span className="landing-chat-author">
-                streaimod <span className="landing-chat-bot-label">BOT</span>
+          <div className="landing-chat-thread">
+            <div className="landing-chat-message">
+              <span className="landing-chat-avatar landing-chat-avatar--command" aria-hidden="true">
+                N
               </span>
-              <p className="landing-chat-text">
-                @avery Yep! The replay stays right here on the channel.
-              </p>
-              <span className="landing-chat-source">
-                <Check size={13} /> Your saved answer
-              </span>
+              <div className="landing-chat-content">
+                <span className="landing-chat-author">noah</span>
+                <p className="landing-chat-text">
+                  <code className="landing-chat-command">!schedule</code>
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="landing-chat-message">
-            <span className="landing-chat-avatar landing-chat-avatar--command" aria-hidden="true">
-              N
-            </span>
-            <div className="landing-chat-content">
-              <span className="landing-chat-author">noah</span>
-              <p className="landing-chat-text">
-                <code className="landing-chat-command">!schedule</code>
-              </p>
-            </div>
-          </div>
-          <div className="landing-chat-reply">
-            <span className="landing-chat-avatar landing-chat-avatar--bot" aria-hidden="true">
-              <ShieldCheck size={17} strokeWidth={1.8} />
-            </span>
-            <div className="landing-chat-content">
-              <span className="landing-chat-author">
-                streaimod <span className="landing-chat-bot-label">BOT</span>
+            <div className="landing-chat-reply">
+              <span className="landing-chat-avatar landing-chat-avatar--bot" aria-hidden="true">
+                <ShieldCheck size={17} strokeWidth={1.8} />
               </span>
-              <p className="landing-chat-text">Tuesdays & Thursdays. See you at 7 PM!</p>
-              <span className="landing-chat-source">
-                <Terminal size={13} /> Your command reply
-              </span>
+              <div className="landing-chat-content">
+                <span className="landing-chat-author">
+                  streaimod <span className="landing-chat-bot-label">BOT</span>
+                </span>
+                <p className="landing-chat-text">Tuesdays & Thursdays. See you at 7 PM!</p>
+                <span className="landing-chat-source">
+                  <Terminal size={13} /> Your command reply
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -165,14 +198,10 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
 
       <main id="landing-main" tabIndex={-1}>
         <section className="landing-intro landing-container" aria-labelledby="landing-title">
+          <HeroOrbits />
           <div className="landing-intro-copy">
-            <p className="landing-kicker">
-              <span className="landing-status-dot" /> A quieter chat. A better stream.
-            </p>
             <h1 className="landing-title" id="landing-title">
-              Be in the
-              <br />
-              moment.
+              Be in the moment.
               <br />
               <span className="landing-title-aside">Not in the chat.</span>
             </h1>
@@ -271,12 +300,12 @@ export default function LandingPage({ onNavigate }: LandingPageProps) {
               <span className="landing-command-line">
                 <code className="landing-command-trigger">!links</code>
                 <ArrowRight size={14} />
-                <span>Your socials</span>
+                <span className="landing-command-response">Your socials</span>
               </span>
               <span className="landing-command-line">
                 <code className="landing-command-trigger">!schedule</code>
                 <ArrowRight size={14} />
-                <span>Your next stream</span>
+                <span className="landing-command-response">Your next stream</span>
               </span>
             </div>
           </article>

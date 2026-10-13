@@ -64,8 +64,7 @@ a {
   color: inherit;
 }
 
-.boot-screen,
-.onboarding-root {
+.boot-screen {
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -73,7 +72,6 @@ a {
 }
 
 .boot-panel,
-.onboarding-panel,
 .panel,
 .board-lane,
 .channel-banner,
@@ -104,14 +102,6 @@ a {
   font-weight: 600;
 }
 
-.onboarding-panel {
-  width: min(100%, 540px);
-  padding: 58px 52px 46px;
-  border-radius: 28px;
-  text-align: left;
-}
-
-.onboarding-copy h1,
 .page-header h1,
 .modal-header h2 {
   margin: 0;
@@ -123,24 +113,6 @@ a {
   text-wrap: balance;
 }
 
-.onboarding-copy {
-  display: grid;
-  gap: 14px;
-  margin: 34px 0 26px;
-}
-
-.onboarding-copy h1 {
-  font-size: clamp(2.4rem, 4.8vw, 3.5rem);
-  max-width: 8ch;
-}
-
-.onboarding-copy p:last-child {
-  max-width: 30ch;
-  font-size: 1.02rem;
-  text-wrap: pretty;
-}
-
-.onboarding-copy p:last-child,
 .page-text,
 .modal-header p,
 .helper-text,
@@ -158,11 +130,6 @@ a {
   font-size: 0.94rem;
   line-height: 1.7;
   max-width: 34ch;
-}
-
-.onboarding-brand {
-  display: flex;
-  justify-content: flex-start;
 }
 
 .brand-block {
@@ -1516,8 +1483,7 @@ tbody td {
 }
 
 @media (max-width: 760px) {
-  .main-content,
-  .onboarding-root {
+  .main-content {
     padding: 18px;
   }
 
@@ -1554,10 +1520,6 @@ tbody td {
 
   .feature-action-controls {
     align-items: stretch;
-  }
-
-  .onboarding-panel {
-    padding: 40px 30px 32px;
   }
 
   .brand-mark-full {
