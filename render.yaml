@@ -11,6 +11,8 @@ services:
     startCommand: npm run start --workspace @ai-mod/backend
     healthCheckPath: /health
     envVars:
+      - key: NODE_VERSION
+        value: "24.22.1"
       - key: NODE_ENV
         value: production
       - key: PORT
@@ -65,3 +67,5 @@ services:
         - package.json
         - package-lock.json
         - .env.schema
+        - .node-version
+        - render.yaml
