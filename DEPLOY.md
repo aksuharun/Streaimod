@@ -9,6 +9,24 @@ This repository is split into:
 
 The backend keeps in-memory managed stream runtimes, so it is better on a long-running Node host such as Render than on a function-only platform.
 
+## Backend security runtime
+
+- Use Node.js 24.22.1 or a newer patched 24.x release. The minimum fixes
+  CVE-2026-111497 (Brotli decoder memory corruption) and the other October
+  2026 Node.js security issues.
+- `.node-version`, package engines, `render.yaml`, and the backend Docker
+  image specify the patched runtime. Set `NODE_VERSION=24.22.1` on existing
+  Render services too; repository settings do not override a dashboard env var.
+- Redeploy the backend after changing the runtime and verify the selected
+  Node.js version in the Render build logs. Updating npm packages or restarting
+  an old deployment alone does not replace its Node.js runtime.
+- JSON request decompression is disabled as defense-in-depth. Send plain JSON;
+  compressed JSON requests receive HTTP 415. This is not a substitute for the
+  runtime update, since outbound HTTP clients can also decompress responses.
+- Both current frontend deployments use `https://api.streaimod.com`, backed by
+  the Render service tracking `dev`. A `competition-snapshot` backend source
+  update does not require a separate service deployment while this remains true.
+
 ## Dockerized local stack
 
 1. Copy `.env.docker.example` to `.env.docker`.

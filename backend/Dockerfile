@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:20-bookworm-slim AS deps
+FROM node:24.22.1-bookworm-slim AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -13,7 +13,7 @@ FROM deps AS build
 COPY backend backend
 RUN npm run build --workspace @ai-mod/backend
 
-FROM node:20-bookworm-slim AS runtime
+FROM node:24.22.1-bookworm-slim AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production

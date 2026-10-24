@@ -58,6 +58,11 @@ const notFoundHandler: RequestHandler = (_request, response) => {
 }
 
 const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
+  if (error?.type === 'encoding.unsupported') {
+    response.status(415).json({ error: 'Compressed request bodies are not supported' })
+    return
+  }
+
   if (error instanceof SyntaxError && 'body' in error) {
     response.status(400).json({ error: 'Invalid JSON payload' })
     return
@@ -77,7 +82,8 @@ export function createApp(configure?: AppConfigurer): Express {
 
   app.disable('x-powered-by')
   app.use(corsHandler)
-  app.use(express.json({ limit: '1mb' }))
+  // Browser clients send plain JSON; never decompress untrusted request bodies.
+  app.use(express.json({ limit: '1mb', inflate: false }))
 
   app.get('/health', (_request, response) => {
     response.status(200).json({ status: 'ok' })
