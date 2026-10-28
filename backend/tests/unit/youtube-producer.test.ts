@@ -1,3 +1,5 @@
+import type { Mock } from 'vitest'
+
 import {
   createYoutubeProducerRuntime,
   type YoutubeProducerLogger
@@ -14,10 +16,10 @@ type MockYoutubeListener = {
     message: Array<(message: any) => void | Promise<void>>
     error: Array<(error: unknown) => void | Promise<void>>
   }
-  on: ReturnType<typeof vi.fn>
-  off: ReturnType<typeof vi.fn>
-  start: ReturnType<typeof vi.fn>
-  stop: ReturnType<typeof vi.fn>
+  on: Mock<(event: string, handler: (value: any) => void | Promise<void>) => MockYoutubeListener>
+  off: Mock<() => MockYoutubeListener>
+  start: Mock<() => Promise<{ liveChatId: string; liveVideoId: string }>>
+  stop: Mock<() => Promise<void>>
 }
 
 function createMockYoutubeListener(): MockYoutubeListener {
